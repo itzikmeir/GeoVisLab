@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Template</title>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+
+<style>
+  /* GLOBAL FONT RESET - STRICT ARIAL */
+  * { box-sizing: border-box; user-select: none; font-family: Arial, sans-serif !important; }
+  html, body { height: 100%; margin: 0; background: #0b0f17; color: #e8eefc; overflow: hidden; font-size: 14px; }
+
+  .root { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+  
+  /* Shared Panel Style */
+  .panel { 
+      border: 1px solid rgba(255,255,255,0.12); 
+      background: rgba(11,15,23,0.95); 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4); 
+      border-radius: 8px; 
+  }
+
+  .top { flex: 1; min-height: 0; display: flex; gap: 8px; direction: ltr; }
+
+  /* Map Panel */
+  .mapPanel { flex: 1; min-width: 0; position: relative; overflow: hidden; background: #000; }
+  #mapStage { position: absolute; left: 0; top: 0; transform-origin: 0 0; touch-action: none; will-change: transform; }
+  #baseImg { display: block; pointer-events: none; }
+  #overlaySvg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: auto; }
+
+  .ctrlCol { position: absolute; left: 10px; top: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 10; }
+  
+  .ctrlBtn, .filterBtn { 
+      width: 40px; height: 40px; 
+      border-radius: 8px; 
+      border: 1px solid rgba(255,255,255,0.2); 
+      background: rgba(15,23,42,0.9); 
+      color: white; cursor: pointer; 
+      display: flex; align-items: center; justify-content: center; 
+      transition: all 0.1s; 
+  }
+  .ctrlBtn:hover, .filterBtn:hover { background: rgba(255,255,255,0.1); }
+  .ctrlBtn svg, .filterBtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+  .filterBtn { position: absolute; left: 10px; bottom: 10px; z-index: 20; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+  .filterBtn.has-active::after { 
+      content: ""; position: absolute; top: 6px; right: 6px; 
+      width: 8px; height: 8px; background: #F59E0B; 
+      border-radius: 50%; border: 1px solid #1e293b;
+  }
+
+  .mapLegend { position: absolute; right: 10px; bottom: 10px; padding: 10px; width: 140px; direction: rtl; text-align: right; pointer-events: none; z-index: 15; font-size: 14px; }
+  .legRow { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .legLine { width: 24px; height: 3px; border-radius: 1px; }
+
+  /* Task Panel */
+  .taskPanel {font-family: Arial, sans-serif; width: 430px; max-width: 40%; display: flex; flex-direction: column; gap: 12px; padding: 16px; direction: rtl; text-align: right; overflow-y: auto; }
+  .h { font-weight: 700; font-size: 24px; color: #fff; margin-bottom: 4px; }
+  .muted { font-size: 20px; opacity: 0.8; line-height: 1.5; white-space: pre-wrap; }
+  .sep { height: 1px; background: rgba(255,255,255,0.1); margin: 4px 0; }
+  
+  .recBox { 
+      background: rgba(59,130,246,0.15); 
+      border: 1px solid rgba(59,130,246,0.4); 
+      padding: 12px 16px; 
+      border-radius: 8px; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center;
+      font-family: Arial, sans-serif !important;
+  }
+  .recLabel { font-size: 20px !important; font-weight: normal; color: #e8eefc; }
+  .recVal { font-family: Arial, sans-serif !important; font-size: 20px !important; font-weight: 800; color: #60A5FA; }
+
+  .btnPrimary { width: 100%; padding: 14px; background: #2563EB; color: white; border: none; border-radius: 8px; font-size: 20px; font-weight: 700; cursor: pointer; margin-top: auto; }
+  .btnPrimary:hover { background: #1D4ED8; }
+
+  /* Bottom Panel Layout - RTL */
+  .bottom { height: 260px; display: flex; gap: 8px; direction: rtl; }
+  
+  /* 1. GANTT PANEL (Rightmost) */
+  .ganttPanel { 
+      width: 38%; 
+      min-width: 320px; 
+      padding: 12px; 
+      direction: rtl; 
+      display: flex; 
+      flex-direction: column; 
+  }
+
+  /* 2. VIZ PANEL (Center) */
+  .vizPanel { 
+      flex: 1; 
+      padding: 12px; 
+      direction: rtl; 
+      overflow: hidden; 
+      display: flex; 
+      flex-direction: column; 
+  }
+
+  /* 3. LEGEND PANEL (Leftmost) */
+  .legendPanel { 
+      width: 190px; 
+      padding: 12px; 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: flex-start; 
+      direction: rtl; 
+      overflow-y: auto; 
+  }
+  .legItem { margin-bottom: 12px; display: flex; align-items: flex-start; gap: 8px; }
+  .legColorBox { width: 14px; height: 14px; margin-top: 3px; border-radius: 3px; flex-shrink: 0; }
+  .legContent { display: flex; flex-direction: column; font-family: Arial !important;}
+  .legTitle { font-weight: 800; font-size: 14px; font-family: Arial !important;}
+  .legDesc { font-size: 12px; opacity: 0.7; margin-top: 2px; font-family: Arial !important;}
+
+  /* Viz Container inside Panel */
+  #viz-container {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+    border: 2px solid #3B82F6; 
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px; 
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  
+  .viz-headers-row {
+      display: flex; width: 100%; margin-bottom: 8px; padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .viz-header-item {
+      flex: 1; text-align: center; font-weight: bold; font-size: 13px; color: #cbd5e1;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+
+  /* Heatmap - Fixed Column Width Logic */
+  .heatmap-table { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; }
+  
+  /* Force fixed width on first column, let others flex */
+  .heatmap-table th:first-child, 
+  .heatmap-table td:first-child { 
+      width: 90px; /* Fixed narrow width */
+      max-width: 90px;
+      padding-left: 4px; 
+      text-align: right !important; 
+      white-space: nowrap;
+  }
+  
+  .heatmap-table th { padding-bottom: 6px; text-align: center; vertical-align: bottom; }
+  .heatmap-table td { border-bottom: 1px solid rgba(255,255,255,0.1); }
+  
+  .heatmap-cell { 
+      text-align: center; vertical-align: middle; 
+      color: #fff; font-weight: 900; font-size: 15px;
+      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 5px rgba(0,0,0,0.8);
+      margin: 2px; border-radius: 4px; height: 100%;
+  }
+  .heatmap-table td > div { height: 85%; width: 92%; margin: 0 auto; display:flex; align-items:center; justify-content:center; border-radius:4px; }
+  .segment-badge {
+      display: inline-block; width: 20px; height: 20px; line-height: 20px;
+      border-radius: 50%; background-color: #1E4ED8; color: white; text-align: center; font-weight: bold; font-size: 11px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+
+  /* Stacked Bars */
+  .stacked-wrapper { display: flex; width: 100%; height: 100%; align-items: flex-end; }
+  .stacked-col-container { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 0 10px; }
+  .stacked-bar { width: 60%; display: flex; flex-direction: column-reverse; border-radius: 4px 4px 0 0; overflow: hidden; background: rgba(255,255,255,0.05); }
+  .stack-segment { width: 100%; position: relative; border-top: 1px solid rgba(255,255,255,0.2); overflow: visible !important; box-sizing: border-box; }
+  .stack-label { position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); text-align: center; color: white; font-weight: bold; font-size: 11px; text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 2px black; white-space: nowrap; pointer-events: none; display: flex; align-items: center; justify-content: center; gap: 4px; }
+
+  /* Radar */
+  .radar-wrapper { display: flex; width: 100%; height: 100%; align-items: center; justify-content: space-around; direction: rtl; }
+  .radar-chart { 
+      position: relative; flex: 1; height: 100%; 
+      display: flex; flex-direction: column; align-items: center; justify-content: center; 
+  }
+  .radar-badge-corner { position: absolute; top: 5px; right: 10px; z-index: 10; display:flex; align-items:center; gap:6px; font-weight:bold; font-size:12px; color:#ddd; }
+
+  /* Gantt Styles */
+  .ganttScroll { 
+      flex: 1; 
+      overflow-y: auto; 
+      overflow-x: hidden; 
+      padding-left: 0; 
+      padding-right: 4px;
+      direction: rtl; 
+  }
+  
+  .ganttRow { 
+      display: flex; align-items: center; height: 42px; margin-bottom: 10px; 
+      cursor: pointer; transition: 0.1s; 
+      border-radius: 6px; border: 1px solid transparent; 
+      position: relative; 
+      margin-left: 4px; 
+  }
+  .ganttRow:hover { background: rgba(255,255,255,0.05); }
+  
+  .ganttRow.active { 
+      background: rgba(59,130,246,0.2); 
+      border: 2px solid #3B82F6; 
+      box-shadow: inset 0 0 10px rgba(59,130,246,0.3);
+  }
+
+  .gLabel { width: 60px; font-weight: 700; font-size: 14px; }
+  .gTrackContainer { flex: 1; height: 28px; position: relative; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+  .gBar { height: 100%; position: absolute; right: 0; top: 0; bottom: 0; border-radius: 4px; overflow: hidden; direction: rtl; display: flex; }
+  .gSeg { height: 100%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 900; color: #000; background: #8CCBFF; border-left: 3px solid #000; box-sizing: border-box; }
+  .gSeg:last-child { border-left: none; }
+  .gAxis { position: relative; height: 20px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.1); margin-right: 60px; direction: ltr; }
+
+  /* Modals */
+  .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(2px); }
+  .backdrop.show { display: flex; }
+  .modal { background: #1b1b1c; border: 1px solid #334155; width: 400px; max-width: 90%; padding: 20px; border-radius: 12px; text-align: center; direction: rtl; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+  .modalBtns { display: flex; gap: 10px; margin-top: 20px; justify-content: center; }
+  .mBtn { padding: 10px 20px; border-radius: 6px; cursor: pointer; border: none; font-weight: 700; flex:1; }
+  .mBtn.yes { background: #2563EB; color: white; }
+  .mBtn.no { background: rgba(255,255,255,0.1); color: white; }
+  .filterRow { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .eyeBtn { background: none; border: none; color: white; cursor: pointer; opacity: 0.7; display:flex; align-items:center; gap:4px; }
+  .eyeBtn.on { opacity: 1; color: #60A5FA; }
+  /* --- תיקון אגרסיבי לכפתורי המפה (זום/מצפן) --- */
+            /* --- תיקון סופי ומוחלט לכפתורי המפה --- */
+            
+            /* 1. הקופסה שעוטפת את הכפתורים - לבנה ואטומה */
+            div.maplibregl-ctrl-group {
+                background: #ffffff !important;
+                border: 1px solid #ccc !important;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+                opacity: 1 !important;
+            }
+
+            /* 2. הכפתורים עצמם - איפוס מלא */
+            div.maplibregl-ctrl-group button {
+                background: #ffffff !important; /* שימוש ב-background מקצר */
+                opacity: 1 !important;
+                border: 0 !important;
+                border-bottom: 1px solid #ddd !important;
+                transition: none !important; /* ביטול אנימציות שקיפות */
+                cursor: pointer !important;
+            }
+            
+            /* הסרת קו תחתון מהכפתור האחרון */
+            div.maplibregl-ctrl-group button:last-child {
+                border-bottom: 0 !important;
+            }
+
+            /* 3. מצב HOVER - אפור ברור ללא שקיפות */
+            div.maplibregl-ctrl-group button:hover {
+                background: #cccccc !important;
+                opacity: 1 !important;
+            }
+
+            /* 4. האייקונים (הפלוס/מינוס) - הכרחה לשחור */
+            .maplibregl-ctrl-icon, 
+            div.maplibregl-ctrl-group button span {
+                filter: grayscale(100%) brightness(0) !important; /* הופך הכל לשחור */
+                opacity: 1 !important;
+                background-color: transparent !important; /* שלא יסתיר את הרקע האפור */
+            }
+</style>
+</head>
+
+<body>
+
+<div class="root">
+    <div class="top">
+       </div>
+    
+    <div class="mapPanel">
+        <div id="mapStage"></div>
+        </div>
+</div>
+
+<script>
+// 1. ה"עוגן" שלנו - שים את זה בשורה הראשונה של הסקריפט!
+// אנחנו נחליף את השורה הזו בדיוק בנתונים האמיתיים
+/* DATA_INJECTION_POINT */
+
+// 2. בדיקת הגנה (כדי שלא יקרוס אם אין נתונים)
+if (typeof DATA === 'undefined') {
+    console.error("DATA לא הוגדר! הזרקת הנתונים נכשלה.");
+    var DATA = { mapState: {}, routes: {} }; // מונע קריסה מוחלטת
+}
+
+// 3. כאן מתחיל הקוד הרגיל שלך
+console.log("Scenario Loaded:", DATA.scenarioName);
+
+const map = new maplibregl.Map({
+    container: 'mapStage',
+    // ... שאר הקוד שלך ...
+});
+let scale = 1, pan = {x: 0, y: 0}, picked = DATA.recommendedRoute || 'A';
+let filters = { routes: true, traffic: true, toll: true, comm: true, parks: true };
+
+const els = {
+    mapPanel: document.querySelector('.mapPanel'), 
+    mapStage: document.getElementById('mapStage'),
+    baseImg: document.getElementById('baseImg'),
+    svg: document.getElementById('overlaySvg'),
+    taskText: document.getElementById('taskText'),
+    requirementsText: document.getElementById('requirementsText'),
+    recRoute: document.getElementById('recRoute'),
+    pickedDisplay: document.getElementById('pickedDisplay'),
+    vizContainer: document.getElementById('viz-container'),
+    vizLegend: document.getElementById('vizLegendContent'),
+    gantt: document.getElementById('ganttContainer'),
+    gAxis: document.getElementById('ganttAxis'),
+    filterBtn: document.getElementById('openFilter'),
+    filterList: document.getElementById('filterList'),
+    confirmText: document.getElementById('confirmText'),
+    confirmWarn: document.getElementById('confirmWarning')
+};
+
+// Init Legend
+DATA.vizConfig.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'legItem';
+    row.innerHTML = '<div class="legColorBox" style="background:'+c.color+'"></div>' + 
+                    '<div class="legContent"><div class="legTitle">'+c.label+'</div><div class="legDesc">'+c.desc+'</div></div>';
+    els.vizLegend.appendChild(row);
+});
+
+// Init Map Image
+els.baseImg.src = DATA.baseMapDataUrl;
+els.baseImg.onload = () => {
+    const w = els.baseImg.naturalWidth || DATA.mapView.width;
+    const h = els.baseImg.naturalHeight || DATA.mapView.height;
+    els.mapStage.style.width = w + 'px';
+    els.mapStage.style.height = h + 'px';
+    els.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    updateTransform();
+};
+if (els.baseImg.complete && els.baseImg.naturalWidth > 0) els.baseImg.onload();
+
+els.taskText.textContent = DATA.taskText;
+if (els.requirementsText) {
+  const t = String(DATA.requirementsText || '').trim();
+  if (t) { els.requirementsText.style.display = 'block'; els.requirementsText.textContent = t; }
+}
+
+els.recRoute.textContent = 'מסלול ' + heb(DATA.recommendedRoute);
+
+// Projection Helpers
+function project(ll) {
+    const merc = (lon, lat) => {
+        const x = (lon + 180) / 360;
+        const sin = Math.sin(lat * Math.PI / 180);
+        const y = (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI));
+        return { x, y };
+    };
+    const c = merc(DATA.mapView.center[0], DATA.mapView.center[1]);
+    const p = merc(ll[0], ll[1]);
+    const worldSize = Math.pow(2, DATA.mapView.zoom) * 512;
+    return {
+        x: DATA.mapView.width / 2 + (p.x - c.x) * worldSize,
+        y: DATA.mapView.height / 2 + (p.y - c.y) * worldSize
+    };
+}
+function heb(id) { return id === 'A' ? 'א' : id === 'B' ? 'ב' : 'ג'; }
+
+function getTickLine(p1, p2, p3, len) {
+    let vx1 = p2.x - p1.x, vy1 = p2.y - p1.y;
+    let vx2 = p3.x - p2.x, vy2 = p3.y - p2.y;
+    const l1 = Math.hypot(vx1, vy1) || 1;
+    const l2 = Math.hypot(vx2, vy2) || 1;
+    vx1/=l1; vy1/=l1; vx2/=l2; vy2/=l2;
+    let bx = vx1 + vx2, by = vy1 + vy2;
+    const bl = Math.hypot(bx, by);
+    if(bl < 1e-5) { bx = -vy1; by = vx1; } else { bx/=bl; by/=bl; }
+    const nx = -by, ny = bx;
+    return [{x: p2.x - nx*len, y: p2.y - ny*len}, {x: p2.x + nx*len, y: p2.y + ny*len}];
+}
+
+function getOffsetPath(coords, offsetPx) {
+    if(coords.length < 2) return '';
+    let d = '';
+    for(let i=0; i<coords.length; i++) {
+        const curr = project(coords[i]);
+        const next = coords[i+1] ? project(coords[i+1]) : null;
+        let dx, dy;
+        if (next) { dx = next.x - curr.x; dy = next.y - curr.y; } 
+        else { dx = curr.x - project(coords[i-1]).x; dy = curr.y - project(coords[i-1]).y; }
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy/len, ny = dx/len;
+        d += (i===0 ? 'M' : 'L') + (curr.x + nx * offsetPx).toFixed(1) + ',' + (curr.y + ny * offsetPx).toFixed(1) + ' ';
+    }
+    return d;
+}
+
+// Drawing Map
+// Drawing Map
+function drawMap() {
+    els.svg.innerHTML = '';
+    
+    // יצירת קבוצות (Groups) לכל שכבה
+    const gParks = g('gp');       // פארקים (הכי למטה)
+    const gComm = g('gc');        // קליטה (מעל פארקים, מתחת למסלולים)
+    const gToll = g('gt');        // אגרה (מתחת למסלולים)
+    const gRoutesHalo = g('grh'); // הילה של המסלולים
+    const gRoutes = g('gr');      // המסלולים עצמם
+    const gTraffic = g('gtr');    // עומס (מעל המסלולים)
+    const gTollIco = g('gti');    // אייקונים של אגרה
+    const gSegs = g('gs');        // סימוני מקטעים (1, 2, 3)
+    const gOver = g('go');        // אלמנטים עליונים (דגלונים, מוצא/יעד)
+
+    // סדר ההוספה קובע את סדר ה-Z (מי שמתווסף אחרון - עליון יותר)
+    // שים לב: gComm מתווסף בהתחלה כדי להיות מתחת ל-gRoutes
+    els.svg.append(gParks, gComm, gToll, gRoutesHalo, gRoutes, gTraffic, gTollIco, gSegs, gOver);
+
+    // ציור תקשורת (Purple Zones)
+    if(filters.comm) DATA.catCommZones.forEach(z => gComm.appendChild(mkPoly(z.ring, DATA.colors.comm.fill, DATA.colors.comm.outline)));
+    
+    // ציור פארקים
+    if(filters.parks) DATA.manualParks.forEach(p => gParks.appendChild(mkPoly(p.ring, DATA.colors.parks.fill, DATA.colors.parks.outline)));
+    
+    // ציור אגרה (עם הצל שהוספנו קודם)
+    if(filters.toll) DATA.catTollSegs.forEach(seg => {
+         const shadow = mkPath(seg.coords, 'rgba(0,0,0,0.35)', 10);
+         gToll.appendChild(shadow);
+
+         const p1 = document.createElementNS('http://www.w3.org/2000/svg','path');
+         p1.setAttribute('d', getOffsetPath(seg.coords, 3)); 
+         p1.setAttribute('stroke', DATA.colors.toll); 
+         p1.setAttribute('stroke-width', 2); 
+         p1.setAttribute('fill', 'none');
+         
+         const p2 = document.createElementNS('http://www.w3.org/2000/svg','path');
+         p2.setAttribute('d', getOffsetPath(seg.coords, -3)); 
+         p2.setAttribute('stroke', DATA.colors.toll); 
+         p2.setAttribute('stroke-width', 2); 
+         p2.setAttribute('fill', 'none');
+         
+         gToll.append(p1, p2);
+    });
+
+    // ציור מסלולים
+    if(filters.routes) {
+        const routeKeys = ['A', 'B', 'C'].sort((a,b) => a === picked ? 1 : -1);
+        
+        routeKeys.forEach(rid => {
+            const pts = DATA.routes[rid];
+            if(!pts) return;
+            const isSel = rid === picked;
+            const color = isSel ? DATA.colors.routeSelected : DATA.colors.routeRegular;
+            
+            // Halo (צללית סביב המסלול להפרדה)
+            gRoutesHalo.appendChild(mkPath(pts, 'rgba(0,0,0,0.3)', isSel ? 10 : 8));
+            
+            // הקו עצמו
+            const line = mkPath(pts, color, isSel ? 6 : 5);
+            line.style.cursor = 'pointer'; 
+            line.onclick = (e) => { e.stopPropagation(); selectRoute(rid); };
+            gRoutes.appendChild(line);
+            
+            // קו שקוף רחב ללחיצה נוחה
+            const hit = mkPath(pts, 'transparent', 20);
+            hit.style.cursor = 'pointer'; 
+            hit.onclick = (e) => { e.stopPropagation(); selectRoute(rid); };
+            gRoutes.appendChild(hit);
+
+            // סימוני מקטעים על המסלול הנבחר
+            if(isSel) {
+                const proj = pts.map(project);
+                const total = getPathLen(proj);
+                [0.33, 0.66].forEach(f => {
+                    const {p, idx} = getPointAtFrac(proj, total, f);
+                    if(p && idx>0 && idx<proj.length-1) {
+                         const lg = getTickLine(proj[idx-1], p, proj[idx+1], 10);
+                         const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+                         l.setAttribute('x1', lg[0].x); l.setAttribute('y1', lg[0].y);
+                         l.setAttribute('x2', lg[1].x); l.setAttribute('y2', lg[1].y);
+                         l.setAttribute('stroke', '#000'); l.setAttribute('stroke-width', 2);
+                         gSegs.appendChild(l);
+                    }
+                });
+                [0.16, 0.5, 0.83].forEach((f,i) => {
+                    const {p} = getPointAtFrac(proj, total, f);
+                    if(p) {
+                         const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+                         g.append(circle(p.x, p.y, 9, color, '#fff'), text(p.x, p.y+4, String(i+1), 11, '#fff'));
+                         gSegs.appendChild(g);
+                    }
+                });
+            }
+        });
+        
+        // באדג'ים (דגלונים)
+        if(DATA.badges) DATA.badges.forEach(b => {
+             const isSel = b.id === picked;
+             const p = project(b.coord);
+             const col = isSel ? DATA.colors.routeSelected : DATA.colors.routeRegular;
+             const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+             g.style.cursor = 'pointer'; g.onclick = (e) => { e.stopPropagation(); selectRoute(b.id); };
+             const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+             rect.setAttribute('x', p.x-40); rect.setAttribute('y', p.y-13); rect.setAttribute('width', 80); rect.setAttribute('height', 26);
+             rect.setAttribute('rx', 7); rect.setAttribute('fill', col); rect.setAttribute('stroke', 'rgba(0,0,0,0.3)');
+             const label = (b.label ? String(b.label) : ('מסלול ' + heb(b.id)));
+             const t = text(p.x, p.y+6, label, 13, isSel ? '#fff' : '#000'); t.setAttribute('font-weight','900');
+             g.append(rect, t);
+             gOver.appendChild(g);
+        });
+    }
+
+    // עומס תנועה (חייב להיות מעל המסלולים כדי שיראו אותו)
+    if(filters.traffic) DATA.catTrafficSegs.forEach(s => {
+        const p = mkPath(s.coords, DATA.colors.traffic, 5); p.setAttribute('stroke-dasharray', '5,5'); gTraffic.appendChild(p);
+    });
+
+    // אייקונים של אגרה
+    if(filters.toll) DATA.catTollLabels.forEach(l => {
+        const p = project(l.coord);
+        const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+        g.append(circle(p.x, p.y, 7, DATA.colors.toll, '#000'), text(p.x, p.y+3, '₪', 10, '#000'));
+        gTollIco.appendChild(g);
+    });
+
+    // מוצא ויעד
+    if(DATA.start) { const p = project(DATA.start); gOver.append(circle(p.x, p.y, 7, '#fff', '#000'), drawLabel(p.x, p.y-20, 'מוצא')); }
+    if(DATA.end) { 
+        const p = project(DATA.end); 
+        const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+        g.innerHTML = '<path transform="translate('+(p.x-10)+','+(p.y-22)+') scale(0.85)" d="M12 0c-6.6 0-12 5.4-12 12 0 8 12 24 12 24s12-16 12-24c0-6.6-5.4-12-12-12zm0 16c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z" fill="#d11111" stroke="#000" stroke-width="1"/>';
+        gOver.append(g, drawLabel(p.x, p.y-30, 'יעד'));
+    }
+}
+
+// Map SVG Helpers
+function g(id){ const e = document.createElementNS('http://www.w3.org/2000/svg','g'); e.id=id; return e; }
+function mkPath(c,col,w){
+    const d=c.map((pt,i)=>(i==0?'M':'L')+project(pt).x+','+project(pt).y).join(' ');
+    const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d',d); p.setAttribute('stroke',col); p.setAttribute('stroke-width',w); p.setAttribute('fill','none'); p.setAttribute('stroke-linecap','round'); p.setAttribute('stroke-linejoin','round');
+    return p;
+}
+function mkPoly(r,f,s){
+    const pts=r.map(pt=>project(pt).x+','+project(pt).y).join(' ');
+    const p=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    p.setAttribute('points',pts); p.setAttribute('fill',f); p.setAttribute('stroke',s); p.setAttribute('stroke-width',2);
+    return p;
+}
+function circle(x,y,r,f,s){
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r',r); c.setAttribute('fill',f); c.setAttribute('stroke',s);
+    return c;
+}
+function text(x,y,t,sz,f){
+    const el=document.createElementNS('http://www.w3.org/2000/svg','text');
+    el.setAttribute('x',x); el.setAttribute('y',y); el.setAttribute('text-anchor','middle'); el.setAttribute('font-size',sz); el.setAttribute('fill',f); el.setAttribute('font-family','Arial'); el.textContent=t;
+    return el;
+}
+function drawLabel(x,y,txt){
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    const w=txt.length*7+10, h=18;
+    const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    r.setAttribute('x',x-w/2); r.setAttribute('y',y-h/2); r.setAttribute('width',w); r.setAttribute('height',h); r.setAttribute('rx',4); r.setAttribute('fill','rgba(0,0,0,0.8)');
+    const t=text(x,y+4,txt,11,'#fff'); t.setAttribute('font-weight','bold');
+    g.append(r,t); return g;
+}
+function getPathLen(pts){ let l=0; for(let i=1;i<pts.length;i++) l+=Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y); return l; }
+function getPointAtFrac(pts,total,frac){
+    const tg=total*frac; let d=0;
+    for(let i=1;i<pts.length;i++){
+        const dist=Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y);
+        if(d+dist>=tg){ const t=(tg-d)/dist; return {p:{x:pts[i-1].x+(pts[i].x-pts[i-1].x)*t, y:pts[i-1].y+(pts[i].y-pts[i-1].y)*t}, idx:i}; }
+        d+=dist;
+    }
+    return {p:pts[pts.length-1], idx:pts.length-1};
+}
+
+// --- VISUALIZATION LOGIC ---
+function renderVizContainer() {
+    const container = els.vizContainer;
+    container.innerHTML = '';
+    
+    const vizType = DATA.vizType; 
+    const segments = (DATA.routeScores || []).filter(s => s.route === picked).sort((a,b) => a.segment - b.segment);
+    const cats = DATA.vizConfig; 
+
+    if (!segments.length) {
+        container.innerHTML = '<div style="text-align:center; opacity:0.6; margin-top:20px">אין נתונים</div>';
+        return;
+    }
+
+    if (vizType === 'HEATMAP') {
+        const table = document.createElement('table'); table.className = 'heatmap-table';
+        const thead = document.createElement('thead');
+        const hRow = document.createElement('tr');
+        hRow.appendChild(document.createElement('th')); 
+        segments.forEach(seg => {
+            const th = document.createElement('th');
+            th.innerHTML = '<span style="font-size:12px; color:#cbd5e1; margin-left:4px">מקטע</span><span class="segment-badge">' + seg.segment + '</span>';
+            hRow.appendChild(th);
+        });
+        thead.appendChild(hRow); table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        
+        cats.forEach(c => {
+            const tr = document.createElement('tr');
+            const tdName = document.createElement('td');
+            // Left aligned as requested
+            tdName.style.textAlign = 'left'; 
+            tdName.style.padding = '4px'; 
+            tdName.style.color='#ddd';
+            tdName.innerHTML = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-left:6px;background:' + c.color + '"></span>' + c.label;
+            tr.appendChild(tdName);
+            
+            segments.forEach(seg => {
+                const td = document.createElement('td');
+                // טבלת מפת חום גווני אפור
+                //const val = seg[c.key] || 0;
+                //const lightness = 15 + (val * 0.65); 
+                //const bg = 'hsl(220, 25%, ' + lightness + '%)';
+                //td.innerHTML = '<div style="background:'+bg+'" class="heatmap-cell">'+Math.round(val)+'</div>';
+                // טבלת מפת חום גווני ירוק אדום
+                const val = seg[c.key] || 0;
+                // חישוב צבע: 0 = אדום (Hue 0), 100 = ירוק (Hue 120)
+                const hue = Math.round(val * 1.2); 
+                const bg = 'hsl(' + hue + ', 75%, 35%)'; // צבע כהה יחסית כדי שהטקסט הלבן יבלוט
+                td.innerHTML = '<div style="background:'+bg+'; color:white;" class="heatmap-cell">'+Math.round(val)+'</div>';
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+
+    } else if (vizType === 'STACKED') {
+        const headerRow = document.createElement('div'); headerRow.className = 'viz-headers-row';
+        segments.forEach(seg => {
+            const el = document.createElement('div'); el.className = 'viz-header-item';
+            el.innerHTML = 'מקטע <span class="segment-badge">' + seg.segment + '</span>';
+            headerRow.appendChild(el);
+        });
+        container.appendChild(headerRow);
+
+        const maxPossible = cats.length * 100; 
+        const wrapper = document.createElement('div'); wrapper.className = 'stacked-wrapper';
+        segments.forEach(seg => {
+            const colCont = document.createElement('div'); colCont.className = 'stacked-col-container';
+            const bar = document.createElement('div'); bar.className = 'stacked-bar';
+            
+            let currentTotal = 0;
+            cats.forEach(c => currentTotal += (seg[c.key] || 0));
+            const barHeightPct = Math.min(100, (currentTotal / maxPossible) * 100);
+            bar.style.height = barHeightPct + '%';
+            
+            cats.forEach(c => {
+                const val = seg[c.key] || 0;
+                if(val > 0) {
+                   const item = document.createElement('div');
+                   item.className = 'stack-segment';
+                   item.style.backgroundColor = c.color;
+                   const segH = (val / currentTotal) * 100;
+                   item.style.height = segH + '%';
+                   
+                   // תיקון: אם המקטע קטן (פחות מ-10%), תן לו עדיפות ב-Z כדי שיצוף מעל
+                   if (segH < 10) item.style.zIndex = '10';
+                   else item.style.zIndex = '1';
+
+                   // יצירת אלמנט טקסט נפרד וממורכז
+                   const lbl = document.createElement('div');
+                   lbl.className = 'stack-label';
+                   lbl.innerHTML = '<span>' + c.label + '</span><span>' + Math.round(val) + '</span>';
+                   
+                   item.appendChild(lbl);
+                   bar.appendChild(item);
+                }
+            });
+            colCont.appendChild(bar);
+            wrapper.appendChild(colCont);
+        });
+        container.appendChild(wrapper);
+
+} else if (vizType === 'RADAR') {
+        const wrapper = document.createElement('div'); wrapper.className = 'radar-wrapper';
+        
+        segments.forEach((seg, idx) => {
+             const chartDiv = document.createElement('div'); chartDiv.className = 'radar-chart';
+             
+             // קו הפרדה
+             if (idx > 0) {
+                 chartDiv.style.borderRight = '1px solid rgba(255,255,255,0.15)';
+             }
+
+             const badge = document.createElement('div');
+             badge.className = 'radar-badge-corner';
+             badge.innerHTML = 'מקטע <span class="segment-badge">' + seg.segment + '</span>';
+             chartDiv.appendChild(badge);
+
+             const size = 260; 
+             // 1. הגדלת ה-Padding כדי להכיל את ההזזה הגדולה לצדדים
+             const padding = 180; 
+             const totalSize = size + padding * 2;
+             
+             const cx = totalSize/2, cy = totalSize/2, r = size * 0.9;
+             const labelR = r + 25; 
+             
+             const svgNS = "http://www.w3.org/2000/svg";
+             const svg = document.createElementNS(svgNS, "svg");
+             svg.setAttribute("width", "100%"); svg.setAttribute("height", "100%");
+             svg.setAttribute("viewBox", "0 0 "+totalSize+" "+totalSize);
+             svg.style.overflow = "visible"; 
+             
+             // עיגולי רקע
+             [0.25, 0.5, 0.75, 1].forEach(k => {
+                 const c = document.createElementNS(svgNS, "circle");
+                 c.setAttribute("cx", cx); c.setAttribute("cy", cy); c.setAttribute("r", r*k);
+                 c.setAttribute("fill", "none"); 
+                 c.setAttribute("stroke", "rgba(255,255,255,0.40)");
+                 c.setAttribute("stroke-width", k===1 ? "2" : "1");
+                 svg.appendChild(c);
+             });
+             
+             let pts = [];
+             const angleStep = (Math.PI * 2) / cats.length;
+             
+             cats.forEach((c, i) => {
+                 const val = (seg[c.key] || 0) / 100;
+                 const ang = i * angleStep - Math.PI/2;
+                 
+                 const x = cx + Math.cos(ang) * (r * val);
+                 const y = cy + Math.sin(ang) * (r * val);
+                 pts.push(x + ',' + y);
+                 
+                 const lx = cx + Math.cos(ang) * r;
+                 const ly = cy + Math.sin(ang) * r;
+                 const line = document.createElementNS(svgNS, "line");
+                 line.setAttribute("x1", cx); line.setAttribute("y1", cy);
+                 line.setAttribute("x2", lx); line.setAttribute("y2", ly);
+                 line.setAttribute("stroke", "rgba(255,255,255,0.4)");
+                 svg.appendChild(line);
+
+                 // --- חישוב מיקום מעודכן ---
+                 
+                 const isSide = Math.abs(Math.cos(ang)) > 0.1; 
+                 const isRight = Math.cos(ang) > 0; // חיסכון
+                 const isLeft = Math.cos(ang) < 0;  // קליטה
+
+                 // מיקום בסיסי
+                 let lblX = cx + Math.cos(ang) * labelR;
+                 let lblY = cy + Math.sin(ang) * labelR;
+
+                 // 2. דחיפה אגרסיבית החוצה (85px) כדי למנוע חפיפה עם הרדאר
+                 if (isSide) {
+                     lblX += isRight ? 85 : -85;
+                 } else {
+                     lblY += Math.sin(ang) * 15;
+                 }
+
+                 const gLbl = document.createElementNS(svgNS, "g");
+                 
+                 // 3. הרחבת המלבן ל-150 פיקסלים (במקום 110)
+                 const rectW = 200; 
+                 const rectH = 50; // גובה קומפקטי אך מספק
+                 const rect = document.createElementNS(svgNS, "rect");
+                 
+                 // מירכוז המלבן סביב הנקודה החדשה
+                 rect.setAttribute("x", lblX - rectW/2);
+                 rect.setAttribute("y", lblY - rectH/2);
+                 rect.setAttribute("width", rectW); rect.setAttribute("height", rectH);
+                 rect.setAttribute("rx", rectH/2); 
+                 rect.setAttribute("fill", c.color);
+                 rect.setAttribute("filter", "drop-shadow(0px 2px 2px rgba(0,0,0,0.25))");
+                 
+                 // טקסט
+                 const textEl = document.createElementNS(svgNS, "text");
+                 textEl.setAttribute("x", lblX); 
+                 textEl.setAttribute("y", lblY + 1); // תיקון אופטי קטן למרכז
+                 textEl.setAttribute("text-anchor", "middle");
+                 textEl.setAttribute("dominant-baseline", "middle"); 
+                 textEl.setAttribute("fill", "#fff");
+                 
+                 // עיצוב טקסט
+                 textEl.setAttribute("style", "font-family: Arial, sans-serif; font-weight: 900; font-size: 40px !important; paint-order: stroke fill; stroke: rgba(0,0,0,0.8); stroke-width: 3px; stroke-linecap: round; stroke-linejoin: round;");
+                 
+                 textEl.textContent = c.label + " " + Math.round(seg[c.key]||0);
+
+                 gLbl.appendChild(rect);
+                 gLbl.appendChild(textEl);
+                 svg.appendChild(gLbl);
+             });
+             
+             const poly = document.createElementNS(svgNS, "polygon");
+             poly.setAttribute("points", pts.join(' '));
+             poly.setAttribute("fill", DATA.colors.routeSelected);
+             poly.setAttribute("fill-opacity", "0.4");
+             poly.setAttribute("stroke", DATA.colors.routeSelected);
+             poly.setAttribute("stroke-width", "3");
+             svg.appendChild(poly);
+             
+             chartDiv.appendChild(svg);
+             wrapper.appendChild(chartDiv);
+        });
+        
+        container.appendChild(wrapper);
+    }
+}
+
+// Gantt Logic
+function renderGantt() {
+    const c = els.gantt, ax = els.gAxis;
+    c.innerHTML = ''; ax.innerHTML = '';
+    const scores = DATA.routeScores || [];
+    let maxT = 0;
+    ['A','B','C'].forEach(rid => {
+        const segs = scores.filter(x => x.route === rid);
+        const t = segs.reduce((a,b) => a + (b.timeS || 0), 0);
+        if(t > maxT) maxT = t;
+    });
+    if (maxT === 0) maxT = 1;
+
+    const mins = Math.ceil(maxT/60);
+    for(let i=0; i<=mins; i++){
+        const pos = (i*60/maxT)*100; if(pos > 100) break;
+        const tk = document.createElement('div');
+        tk.style.position='absolute'; tk.style.right=pos+'%'; tk.style.transform='translateX(50%)'; tk.textContent=i;
+        const ln = document.createElement('div');
+        ln.style.position='absolute'; ln.style.right=pos+'%'; ln.style.height='4px'; ln.style.width='1px'; ln.style.background='#555'; ln.style.top='-4px';
+        ax.append(ln, tk);
+    }
+
+    ['A','B','C'].forEach(rid => {
+        const segs = scores.filter(s => s.route === rid).sort((a,b) => a.segment - b.segment);
+        const total = segs.reduce((a,b) => a + (b.timeS || 0), 0) || 1;
+        const row = document.createElement('div');
+        row.className = 'ganttRow' + (rid === picked ? ' active' : '');
+        row.onclick = () => { picked=rid; selectRoute(rid); };
+        const lbl = document.createElement('div'); lbl.className = 'gLabel'; lbl.textContent = 'מסלול ' + heb(rid);
+        const trk = document.createElement('div'); trk.className = 'gTrackContainer';
+        const bar = document.createElement('div'); bar.className = 'gBar'; bar.style.width = (total / maxT * 100) + '%';
+        segs.forEach(s => {
+            const el = document.createElement('div'); el.className = 'gSeg';
+            const pct = ((s.timeS || 0) / total * 100); el.style.width = pct + '%';
+            el.textContent = s.segment;
+            bar.appendChild(el);
+        });
+        trk.appendChild(bar); row.append(lbl, trk); c.appendChild(row);
+    });
+}
+
+function selectRoute(id) {
+    picked = id;
+    els.pickedDisplay.textContent = 'מסלול ' + heb(id);
+    renderVizContainer();
+    renderGantt(); 
+    drawMap();
+}
+
+// FIXED DRIFT-FREE ZOOM LOGIC
+els.mapStage.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = els.mapPanel.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    const newScale = Math.max(1, Math.min(5, scale * factor));
+    
+    pan.x = mx - (mx - pan.x) * (newScale / scale);
+    pan.y = my - (my - pan.y) * (newScale / scale);
+    
+    scale = newScale;
+    updateTransform();
+}, {passive:false});
+
+els.mapStage.onmousedown = e => {
+    e.preventDefault();
+    const s = {x: e.clientX-pan.x, y: e.clientY-pan.y};
+    const mv = m => { pan.x = m.clientX-s.x; pan.y = m.clientY-s.y; updateTransform(); };
+    const up = () => { window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); };
+    window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
+};
+
+// Center Zoom logic
+function zoomCenter(f) {
+    const w = els.mapPanel.offsetWidth, h = els.mapPanel.offsetHeight;
+    const cx = w/2, cy = h/2;
+    const newScale = Math.max(1, Math.min(5, scale * f));
+    pan.x = cx - (cx - pan.x) * (newScale / scale);
+    pan.y = cy - (cy - pan.y) * (newScale / scale);
+    scale = newScale;
+    updateTransform();
+}
+
+document.getElementById('zoomIn').onclick = () => zoomCenter(1.2);
+document.getElementById('zoomOut').onclick = () => zoomCenter(1/1.2);
+document.getElementById('fitView').onclick = () => { scale=1; pan={x:0,y:0}; updateTransform(); };
+
+function updateTransform(){
+    const w = els.mapPanel.offsetWidth, h = els.mapPanel.offsetHeight;
+    const sw = w*scale, sh = h*scale;
+    if(pan.x > 0) pan.x = 0; if(pan.x < w - sw) pan.x = w - sw;
+    if(pan.y > 0) pan.y = 0; if(pan.y < h - sh) pan.y = h - sh;
+    els.mapStage.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${scale})`;
+}
+
+document.getElementById('submitBtn').onclick = () => {
+    els.confirmText.textContent = 'בחרת במסלול '+heb(picked)+'. האם אתה בטוח?';
+    document.getElementById('confirmModal').classList.add('show');
+};
+document.getElementById('cancelConfirm').onclick = () => document.getElementById('confirmModal').classList.remove('show');
+document.getElementById('doConfirm').onclick = () => { alert('הבחירה נשמרה!'); document.getElementById('confirmModal').classList.remove('show'); };
+
+// Filters
+els.filterBtn.onclick = () => {
+    els.filterList.innerHTML = '';
+    const hasActive = Object.values(filters).some(x=>!x);
+    els.filterBtn.classList.toggle('has-active', hasActive);
+    
+    [{k:'routes',l:'מסלולים'},{k:'traffic',l:'עומס'},{k:'toll',l:'אגרה'},{k:'comm',l:'תקשורת'}/*,{k:'parks',l:'פארקים'}*/].forEach(it=>{
+        const div = document.createElement('div'); div.className='filterRow';
+        div.innerHTML = `<span>${it.l}</span><button class="eyeBtn${filters[it.k]?' on':''}" onclick="filters['${it.k}']=!filters['${it.k}']; drawMap(); this.classList.toggle('on'); document.getElementById('openFilter').classList.toggle('has-active', Object.values(filters).some(x=>!x))"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>`;
+        els.filterList.appendChild(div);
+    });
+    document.getElementById('filterModal').classList.add('show');
+};
+document.getElementById('closeFilter').onclick = () => document.getElementById('filterModal').classList.remove('show');
+document.getElementById('showAll').onclick = () => { for(let k in filters)filters[k]=true; drawMap(); els.filterBtn.click(); };
+document.getElementById('hideAll').onclick = () => { for(let k in filters)filters[k]=false; drawMap(); els.filterBtn.click(); };
+
+// Initial Render
+selectRoute(picked);
+try { drawMap(); } catch(e){}
+</script>
+// שים לב: זה חייב להיות בדיוק כך
+const DATA = "DATA_PLACEHOLDER";
+
+// --- לוגיקה (המנוע) ---
+// העתק לכאן את **כל** שאר הקוד שבתוך תגית <script> מ-SCN_001_T.html
+// (חוץ מהגדרת const DATA שכבר רשמנו למעלה)
+
+// דוגמה למה שצריך להיות פה:
+const map = new maplibregl.Map({
+    container: 'mapStage',
+    style: 'https://demotiles.maplibre.org/style.json', // או הסגנון שלך
+    center: DATA.mapState.center || [34.8, 32.1],
+    zoom: DATA.mapState.zoom || 14
+});
+
+map.on('load', () => {
+    // הפונקציות שמציירות את הקווים מה-DATA
+    if (DATA.routes) {
+        // drawRoutes(DATA.routes)...
+    }
+});
+</script>
+</body>
+</html>
