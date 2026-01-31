@@ -7049,7 +7049,7 @@ export default function App() {
         const flatScores = freshScores.flatMap(r => r.segments.map(s => ({...s, route: r.route})));
 
         // החלפנו ב-any זמנית
-        const tasks: { type: any, suffix: string }[] = [];
+    const tasks: { type: any, suffix: string }[] = [];
         if (exportVizSelection.STACKED) tasks.push({ type: "STACKED", suffix: "S" });
         if (exportVizSelection.RADAR) tasks.push({ type: "RADAR", suffix: "R" });
         if (exportVizSelection.HEATMAP) tasks.push({ type: "HEATMAP", suffix: "H" });
