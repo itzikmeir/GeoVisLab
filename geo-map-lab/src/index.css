@@ -18,6 +18,21 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Force a single consistent sans-serif (Arial/Helvetica) across the entire app and exported content */
+* {
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure SVG text uses the same sans-serif font */
+svg, svg * {
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+}
+text, tspan {
+  font-family: inherit !important;
+}
+
 a {
   font-weight: 500;
   color: #646cff;

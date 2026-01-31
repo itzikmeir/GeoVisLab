@@ -10,8 +10,12 @@
 
 <style>
   /* GLOBAL FONT RESET - STRICT ARIAL */
-  * { box-sizing: border-box; user-select: none; font-family: Arial, sans-serif !important; }
-  html, body { height: 100%; margin: 0; background: #0b0f17; color: #e8eefc; overflow: hidden; font-size: 14px; }
+  * { box-sizing: border-box; user-select: none; font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  html, body, input, textarea, button, select { height: 100%; margin: 0; background: #0b0f17; color: #e8eefc; overflow: hidden; font-size: 14px; font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important; }
+
+  /* Ensure SVG text uses the same sans-serif font */
+  svg, svg * { font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important; }
+  text, tspan { font-family: inherit !important; }
 
   .root { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
   

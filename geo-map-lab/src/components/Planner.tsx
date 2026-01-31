@@ -53,7 +53,7 @@ function buildParticipantHtml(args: {
             routeRegular: "#8CCBFF",
             traffic: "#FF0022",
             toll: "#FFE100",
-            comm: { fill: "rgba(170,60,255,0.28)", outline: "rgba(170,60,255,0.65)" },
+            comm: { fill: "rgba(170,60,255,0.15)", outline: "rgba(170,60,255,0.35)" },
             parks: { fill: "#00FF66", outline: "transparent", opacity: 0.95 },
         },
     };
@@ -4632,7 +4632,7 @@ export default function App() {
         return `Scenario_${ymd}_${Date.now()}`;
     });
     const [exportTaskText, setExportTaskText] = useState(
-        "בחר את המסלול המיטבי לאור הדרישות. ניתן לעיין במפה ובפירוט המקטעים למטה לפני קבלת החלטה."
+       "במפה שלפניך מופיעים 3 מסלולים אפשריים בין נקודת המוצא ליעד. בחר ואשר את המסלול שמתעדף את הדרישות"
     );
     const [exportRequirementsText, setExportRequirementsText] = useState<string>("");
     // State עבור בחירת סוגי הויזואליזציה (Multi-select)
