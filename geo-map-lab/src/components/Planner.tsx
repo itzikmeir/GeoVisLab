@@ -7048,9 +7048,7 @@ export default function App() {
         // המרת הציונים לפורמט שטוח עבור ה-HTML
         const flatScores = freshScores.flatMap(r => r.segments.map(s => ({...s, route: r.route})));
 
-        //const tasks: { type: ExportVizType, suffix: string }[] = [];
-        // החלפנו ב-any זמנית
-        const tasks: { type: any, suffix: string }[] = [];
+        const tasks: { type: ExportVizType, suffix: string }[] = [];
         if (exportVizSelection.STACKED) tasks.push({ type: "STACKED", suffix: "S" });
         if (exportVizSelection.RADAR) tasks.push({ type: "RADAR", suffix: "R" });
         if (exportVizSelection.HEATMAP) tasks.push({ type: "HEATMAP", suffix: "H" });
