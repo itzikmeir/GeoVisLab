@@ -1,5 +1,7 @@
 ﻿import { useState } from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route, Link } from 'react-router-dom'; // שים לב: אין כאן BrowserRouter
+
+// ייבוא הקומפוננטות שלך
 import ExportFileManager from './components/ExportFileManager';
 import Planner from './components/Planner';
 import BatchGenerator from './components/BatchGenerator';
@@ -11,6 +13,7 @@ function App() {
   const closeMenu = () => setMenuOpen(false);
 
   return (
+    // כאן מתחיל ה-div הראשי מיד, בלי שום Router שעוטף אותו
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0b0f17', color: '#e2e8f0', fontFamily: 'Arial, sans-serif' }}>
       
       {/* --- בר עליון --- */}
@@ -24,28 +27,18 @@ function App() {
         flexShrink: 0, 
         position: 'relative', 
         zIndex: 1000,
-        direction: 'rtl' // <--- שינוי 1: כיוון מימין לשמאל
+        direction: 'rtl'
       }}>
         
         {/* כפתור המבורגר */}
         <button 
           onClick={toggleMenu}
-          style={{ 
-            background: 'transparent', 
-            border: 'none', 
-            color: '#fff', 
-            fontSize: '24px', 
-            cursor: 'pointer',
-            padding: '0',
-            lineHeight: '1',
-            marginLeft: '15px' // <--- שינוי 2: הרווח עכשיו בצד שמאל של הכפתור
-          }}
+          style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '24px', cursor: 'pointer', padding: '0', lineHeight: '1', marginLeft: '15px' }}
           title="תפריט ראשי"
         >
           &#9776;
         </button>
 
-        {/* שם האפליקציה */}
         <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', letterSpacing: '1px' }}>
           GeoVisLab
         </h1>
@@ -61,7 +54,7 @@ function App() {
             <nav style={{
               position: 'absolute',
               top: '45px', 
-              right: '10px', // נשאר צמוד לימין
+              right: '10px',
               width: '270px',
               background: '#334155',
               border: '1px solid #475569',
@@ -71,66 +64,20 @@ function App() {
               flexDirection: 'column',
               zIndex: 1002,
               overflow: 'hidden',
-              direction: 'rtl' // גם התפריט עצמו יהיה מימין לשמאל
+              direction: 'rtl'
             }}>
-              <Link 
-                to="/" 
-                onClick={closeMenu}
-                style={{ 
-                  padding: '15px', 
-                  color: 'white', 
-                  textDecoration: 'none', 
-                  borderBottom: '1px solid #475569',
-                  transition: 'background 0.2s',
-                  textAlign: 'right' // יישור טקסט לימין
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#475569'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-              >
+              <Link to="/" onClick={closeMenu} style={{ padding: '15px', color: 'white', textDecoration: 'none', borderBottom: '1px solid #475569', transition: 'background 0.2s', textAlign: 'right' }} onMouseOver={(e) => e.currentTarget.style.background = '#475569'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
                 🛠️ תכנון תרחישים
               </Link>
-              <Link 
-                to="/manage-exports" 
-                onClick={closeMenu}
-                style={{ 
-                  padding: '15px', 
-                  color: 'white', 
-                  textDecoration: 'none',
-                  borderBottom: '1px solid #475569',
-                  textAlign: 'right' // יישור טקסט לימין
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#475569'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-              >
+              <Link to="/manage-exports" onClick={closeMenu} style={{ padding: '15px', color: 'white', textDecoration: 'none', borderBottom: '1px solid #475569', textAlign: 'right' }} onMouseOver={(e) => e.currentTarget.style.background = '#475569'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
                 📂 ניהול קבצים מיוצאים
               </Link>
-              <Link 
-                to="/batch-generator" 
-                onClick={closeMenu}
-                style={{ 
-                  padding: '15px', 
-                  color: 'white', 
-                  textDecoration: 'none',
-                  borderBottom: '1px solid #475569',
-                  textAlign: 'right' // יישור טקסט לימין
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#475569'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-              >
+              <Link to="/batch-generator" onClick={closeMenu} style={{ padding: '15px', color: 'white', textDecoration: 'none', borderBottom: '1px solid #475569', textAlign: 'right' }} onMouseOver={(e) => e.currentTarget.style.background = '#475569'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
                 🏭 מחולל המוני (JSON to HTML)
               </Link>
-               <Link 
-                to="/https://www.youtube.com/results?search_query=rick+roll+1000+hours" 
-                onClick={closeMenu}
-                style={{ 
-                  padding: '15px', 
-                  color: 'white', 
-                  textDecoration: 'none',                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#475569'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-              >
-               ⚙️ הגדרות 
-              </Link>
+               <a href="https://www.youtube.com/results?search_query=rick+roll+1000+hours" target="_blank" rel="noreferrer" onClick={closeMenu} style={{ padding: '15px', color: 'white', textDecoration: 'none', textAlign: 'right', display: 'block' }} onMouseOver={(e) => e.currentTarget.style.background = '#475569'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
+                ⚙️ הגדרות 
+              </a>
             </nav>
           </>
         )}
