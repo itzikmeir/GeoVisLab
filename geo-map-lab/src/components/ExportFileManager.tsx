@@ -338,7 +338,8 @@ const ExportFileManager: React.FC = () => {
             <div style={styles.stepIcon}>2</div>
             <h3 style={{ margin: 0, fontSize: '18px' }}>תיקיית קבצים (HTML)</h3>
           </div>
-          <input type="file" webkitdirectory="true" multiple onChange={handleHtmlFolderUpload} style={styles.input} />
+          //@ts-expect-error
+          <input type="file" {...({ webkitdirectory: "true" } as any)} multiple onChange={handleHtmlFolderUpload} style={styles.input} />
           {htmlFiles.length > 0 && <div style={{ marginTop: '10px', color: '#4ade80' }}>✓ זוהו {htmlFiles.length} קבצים</div>}
         </section>
 
