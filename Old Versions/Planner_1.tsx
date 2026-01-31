@@ -554,7 +554,6 @@ function drawMap() {
     // ציור תקשורת (Purple Zones)
     if(filters.comm) DATA.catCommZones.forEach(z => gComm.appendChild(mkPoly(z.ring, DATA.colors.comm.fill, DATA.colors.comm.outline)));
     
-    
     // ציור פארקים
     if(filters.parks) DATA.manualParks.forEach(p => gParks.appendChild(mkPoly(p.ring, DATA.colors.parks.fill, DATA.colors.parks.outline)));
     
@@ -3295,54 +3294,9 @@ function computeRouteScores(
         });
     }
     // -------------------------------------------------------
-    // ... (כאן נגמר הבלוק הקודם של נרמול הפארקים/scenery) ...
 
-    // --- נרמול יחסי לתקשורת (Communication Scaling) ---
-    // המטרה: אם כל המסלולים עם קליטה חלשה, נדגיש את ההבדלים ביניהם
-    // כך שהטוב מביניהם (ה"פחות גרוע") יקבל ציון גבוה.
-
-    // ... (אחרי נרמול הפארקים) ...
-
-    // --- נרמול יחסי לתקשורת (מתוקן) ---
-    const TARGET_COMM_WINNER = 95;
-    const LOW_COMM_THRESHOLD = 70; 
-
-    // 1. חישוב ראשוני + "עיגול למעלה" למקרים של כמעט 100%
-    results.forEach(res => {
-        res.segments.forEach(seg => {
-            // תיקון: אם הכיסוי מעל 90%, תן לו 100 עגול (מפצה על פספוסי דגימה בקצוות)
-            if (seg.fracComm && seg.fracComm > 0.90) {
-                seg.commScore = 100;
-            }
-        });
-    });
-
-    // 2. מציאת הציון המקסימלי *הבודד* הכי גבוה במערכת (לא ממוצע!)
-    let maxSegScoreInSystem = 0;
-    results.forEach(r => {
-        r.segments.forEach(s => {
-            if (s.commScore > maxSegScoreInSystem) maxSegScoreInSystem = s.commScore;
-        });
-    });
-
-    // 3. מבצעים נרמול *רק* אם הציון הכי גבוה במערכת הוא עדיין נמוך (מתחת ל-70)
-    // זה פותר את הבעיה: אם מסלול א' קיבל 100 במקטע 1, לא ניגע בציונים של אף אחד.
-    if (maxSegScoreInSystem > 0 && maxSegScoreInSystem < LOW_COMM_THRESHOLD) {
-        const commFactor = TARGET_COMM_WINNER / maxSegScoreInSystem;
-
-        results.forEach(res => {
-            res.segments.forEach(seg => {
-                if (seg.commScore) {
-                    seg.commScore = Math.min(100, seg.commScore * commFactor);
-                }
-            });
-        });
-    }
-    // -------------------------------------------------------
-
-    return results; // זוהי שורת הסיום של הפונקציה
+    return results;
 }
-
 
 
 // הגדרת המבנה לשמירת תרחיש (JSON)
@@ -6994,113 +6948,86 @@ export default function App() {
             return;
         }
 
-        setExportStatus("ממתין לטעינת מפה מלאה...");
+        setExportStatus("מכין לייצוא...");
 
-        // --- תיקון אולטימטיבי: המתנה למצב 'idle' ---
-        // 'idle' אומר: "סיימתי לטעון את כל האריחים, וסיימתי לצייר הכל".
+        // 1. הסתרת שכבות שאנחנו לא רוצים שייצרבו בתמונה (כמו הקווים המחברים)
+        // אנחנו נסתיר גם את הדגלונים עצמם כדי למנוע כפילויות, כי ה-HTML מצייר אותם מחדש
+        const layersToHide = [
+            "triple-badge-lines", // <-- זה הקו (הרגל) שרצית להוריד
+            "triple-badges", 
+            "triple-badge-text"
+        ];
         
+        const originalVisibility: Record<string, string> = {};
+
+        layersToHide.forEach(id => {
+            if (map.getLayer(id)) {
+                // שמירת המצב הקודם
+                originalVisibility[id] = map.getLayoutProperty(id, 'visibility') as string || 'visible';
+                // הסתרה
+                map.setLayoutProperty(id, 'visibility', 'none');
+            }
+        });
+
+        // 2. המתנה לציור מחדש (כדי שההסתרה תתפוס)
         if (!map.loaded()) {
-             // אם המפה עדיין טוענת משהו, נחכה לאירוע הסיום
              await new Promise<void>(resolve => map.once('idle', resolve));
         }
-
-        // ליתר ביטחון: מכריחים ציור אחרון ומחכים לו
         map.triggerRepaint();
         await new Promise<void>(resolve => map.once('render', resolve));
 
-        // כעת המפה בטוח מוכנה
+        // 3. לקיחת התמונה (עכשיו היא נקייה מקווים ודגלונים)
         const canvas = map.getCanvas();
-        
         let baseMapDataUrl = "";
-        // Temporarily hide overlay layers (routes, edits, measures) so the snapshot contains only the base map
         try {
-            const style = map.getStyle();
-            const overlayLayerIds: string[] = (Array.isArray(style?.layers) ? style.layers : [])
-                .filter((l: any) => isOverlayLayerId(String(l.id || "")))
-                .map((l: any) => String(l.id || ""));
-
-            const prevVisibility: Record<string, string> = {};
-            for (const id of overlayLayerIds) {
-                try {
-                    const cur = map.getLayoutProperty(id, "visibility") as string | undefined;
-                    prevVisibility[id] = cur === undefined ? "visible" : cur;
-                    map.setLayoutProperty(id, "visibility", "none");
-                } catch { }
-            }
-
-            // Ensure a repaint so the hidden layers are not present in the canvas
-            try { map.triggerRepaint(); } catch { }
-            await new Promise<void>((resolve) => {
-                let done = false;
-                const onRender = () => {
-                    if (done) return;
-                    done = true;
-                    try { map.off('render', onRender); } catch { }
-                    resolve();
-                };
-                try { map.once('render', onRender); } catch { setTimeout(resolve, 150); }
-                setTimeout(() => { if (!done) { done = true; try { map.off('render', onRender); } catch { } resolve(); } }, 500);
-            });
-
             // @ts-ignore
             baseMapDataUrl = canvas.toDataURL("image/png");
-
-            // restore visibilities
-            for (const id of Object.keys(prevVisibility)) {
-                try { map.setLayoutProperty(id, "visibility", prevVisibility[id]); } catch { }
-            }
-
-            // give map a chance to repaint back
-            try { map.triggerRepaint(); } catch { }
-
         } catch (e) {
-            console.error("Export failed", e);
-            alert("שגיאת אבטחה (CORS): השרת של המפה חוסם ייצוא תמונה. נסה להחליף סגנון מפה.");
+            console.error("CORS Error", e);
+            alert("שגיאה ביצירת תמונה (CORS).");
+            // במקרה שגיאה נחזיר את המצב לקדמותו
+            layersToHide.forEach(id => {
+                if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', originalVisibility[id]);
+            });
             return;
         }
 
-        // --- המשך הקוד הרגיל שלך... ---
+        // 4. החזרת השכבות למצב רגיל (כדי שהמשתמש ימשיך לראות אותן באפליקציה)
+        layersToHide.forEach(id => {
+            if (map.getLayer(id)) {
+                map.setLayoutProperty(id, 'visibility', originalVisibility[id]);
+            }
+        });
+
+        // --- המשך תהליך הייצוא הרגיל ---
+        
         const w = canvas.width;
         const h = canvas.height;
         const center = map.getCenter();
         const zoom = map.getZoom();
         
-        // --- תיקון קריטי: שליפת הנתונים הכי עדכניים מה-Refs ---
         const currentRoutes = tripleLinesRef.current; 
-        const currentBadges = badgesRef.current; // שימוש ב-Ref המעודכן (מהתיקון למעלה)
+        const currentBadges = badgesRef.current;
         const currentParks = manualParksRef.current;
         const currentTraffic = catTrafficSegsRef.current;
         const currentToll = catTollSegsRef.current;
         const currentComm = catCommZonesRef.current;
 
-        // חישוב מחדש של הנתונים כדי שישקפו עריכות מסלול אחרונות
-        const freshScores = computeRouteScores(
-            map,
-            currentRoutes,
-            currentTraffic,
-            currentToll,
-            currentComm,
-            currentParks
-        );
+        const flatScores = routeScores.flatMap(r => r.segments.map(s => ({...s, route: r.route})));
 
-        // המרת הציונים לפורמט שטוח עבור ה-HTML
-        const flatScores = freshScores.flatMap(r => r.segments.map(s => ({...s, route: r.route})));
-
-        // החלפנו ב-any זמנית
-        const tasks: { type: any, suffix: string }[] = [];
+        const tasks: { type: ExportVizType, suffix: string }[] = [];
         if (exportVizSelection.STACKED) tasks.push({ type: "STACKED", suffix: "S" });
         if (exportVizSelection.RADAR) tasks.push({ type: "RADAR", suffix: "R" });
         if (exportVizSelection.HEATMAP) tasks.push({ type: "HEATMAP", suffix: "H" });
 
         if (tasks.length === 0) {
             alert("אנא בחר לפחות סוג ויזואליזציה אחד לייצוא.");
+            setExportStatus(null);
             return;
         }
 
-        setExportStatus("מכין מפה...");
         const baseName = safeFileName(exportScenarioName || "Scenario");
         
-        // הגדרות תצוגה
         const mapView = {
             center: [center.lng, center.lat] as LngLat,
             zoom: zoom,
@@ -7110,7 +7037,6 @@ export default function App() {
             height: h,
         };
 
-        // טיפול בשמירה לתיקייה (אם נתמך)
         let dirHandle: any = null;
         if (exportSaveMode === 'directory' && (window as any).showDirectoryPicker) {
              if (exportDirHandle) dirHandle = exportDirHandle;
@@ -7132,9 +7058,9 @@ export default function App() {
                 mapView,
                 start,
                 end,
-                routes: currentRoutes,           // שימוש במסלולים הערוכים
-                routeScores: flatScores,         // שימוש בציונים המחושבים מחדש
-                badges: currentBadges,           // שימוש במיקומי התגיות המעודכנים
+                routes: currentRoutes,
+                routeScores: flatScores,
+                badges: currentBadges,
                 manualParks: currentParks,
                 catTrafficSegs: currentTraffic,
                 catTollSegs: currentToll,

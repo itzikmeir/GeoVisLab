@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -8,6 +8,7 @@ declare global {
         showDirectoryPicker?: (options?: Record<string, unknown>) => Promise<unknown>;
     }
 }
+type ExportVizType = "STACKED" | "RADAR" | "HEATMAP";
 type ExportSaveMode = "downloads" | "directory";
 
 function safeFileName(input: string) {
@@ -25,7 +26,7 @@ function buildParticipantHtml(args: {
     taskText: string;
     requirementsText: string;
     recommendedRoute: "A" | "B" | "C";
-    vizType: "STACKED";
+    vizType: ExportVizType;
     baseMapDataUrl: string;
     mapView: { width: number; height: number; zoom: number; center: LngLat };
     start: LngLat | null;
@@ -554,7 +555,6 @@ function drawMap() {
     // ציור תקשורת (Purple Zones)
     if(filters.comm) DATA.catCommZones.forEach(z => gComm.appendChild(mkPoly(z.ring, DATA.colors.comm.fill, DATA.colors.comm.outline)));
     
-    
     // ציור פארקים
     if(filters.parks) DATA.manualParks.forEach(p => gParks.appendChild(mkPoly(p.ring, DATA.colors.parks.fill, DATA.colors.parks.outline)));
     
@@ -1041,6 +1041,7 @@ function updateTransform(){
 
 document.getElementById('submitBtn').onclick = () => {
     els.confirmText.textContent = 'בחרת במסלול '+heb(picked)+'. האם אתה בטוח?';
+    els.confirmWarn.style.display = picked!==DATA.recommendedRoute ? 'block':'none';
     document.getElementById('confirmModal').classList.add('show');
 };
 document.getElementById('cancelConfirm').onclick = () => document.getElementById('confirmModal').classList.remove('show');
@@ -3240,19 +3241,14 @@ function computeRouteScores(
             fracComm,
         };
     }
-    // ... (סוף הפונקציה scoreSegment) ...
-    // }
 
-    // 1. יצירת המערך הראשוני של התוצאות (במקום ה-return הישיר)
-    const results = routes.map((r) => {
+    return routes.map((r) => {
         const line = tripleLines[r] ?? [];
         if (line.length < 2) {
             return { route: r, segments: [], totalLengthM: 0, totalTimeS: 0 };
         }
 
-        // שימוש בפונקציית העזר הקיימת לפיצול ל-3
         const [s1, s2, s3] = split3ByIndices(line);
-        
         const segs: SegmentScore[] = [
             scoreSegment(r, 1, s1),
             scoreSegment(r, 2, s2),
@@ -3264,108 +3260,9 @@ function computeRouteScores(
 
         return { route: r, segments: segs, totalLengthM, totalTimeS };
     });
-
-    // --- שלב נרמול יחסי לפארקים (Intelligent Scaling) ---
-    // המטרה: אם למסלול הכי טוב יש ציון נמוך (למשל 15 מתוך 100),
-    // נמתח את הסקאלה כך שהוא יקבל ציון "יפה" (85) והשאר יגדלו יחסית אליו.
-
-    const TARGET_WINNER_SCORE = 85; // הציון שנרצה לתת למנצח (בסקאלה של 100)
-    const LOW_THRESHOLD = 40;       // סף הפעלה: רק אם המנצח קיבל פחות מזה
-
-    // פונקציית עזר לחישוב ציון פארקים כולל למסלול (ממוצע המקטעים)
-    const getRouteScenicScore = (res: RouteScore) => {
-        if (!res.segments.length) return 0;
-        return res.segments.reduce((sum, s) => sum + s.scenicScore, 0) / res.segments.length;
-    };
-
-    // 1. מציאת הציון הגבוה ביותר בקטגוריית הנוף כרגע
-    const maxRawScore = Math.max(...results.map(r => getRouteScenicScore(r)));
-
-    // 2. בדיקה האם צריך נרמול
-    if (maxRawScore > 0 && maxRawScore < LOW_THRESHOLD) {
-        // חישוב הפקטור
-        const factor = TARGET_WINNER_SCORE / maxRawScore;
-
-        // 3. עדכון הציונים של כל המסלולים בפקטור הזה
-        results.forEach(res => {
-            res.segments.forEach(seg => {
-                // עדכון הציון של המקטע (עם תקרה של 100)
-                seg.scenicScore = Math.min(100, seg.scenicScore * factor);
-            });
-        });
-    }
-    // -------------------------------------------------------
-    // ... (כאן נגמר הבלוק הקודם של נרמול הפארקים/scenery) ...
-
-    // --- נרמול יחסי לתקשורת (Communication Scaling) ---
-    // המטרה: אם כל המסלולים עם קליטה חלשה, נדגיש את ההבדלים ביניהם
-    // כך שהטוב מביניהם (ה"פחות גרוע") יקבל ציון גבוה.
-
-    // ... (אחרי נרמול הפארקים) ...
-
-    // --- נרמול יחסי לתקשורת (מתוקן) ---
-    const TARGET_COMM_WINNER = 95;
-    const LOW_COMM_THRESHOLD = 70; 
-
-    // 1. חישוב ראשוני + "עיגול למעלה" למקרים של כמעט 100%
-    results.forEach(res => {
-        res.segments.forEach(seg => {
-            // תיקון: אם הכיסוי מעל 90%, תן לו 100 עגול (מפצה על פספוסי דגימה בקצוות)
-            if (seg.fracComm && seg.fracComm > 0.90) {
-                seg.commScore = 100;
-            }
-        });
-    });
-
-    // 2. מציאת הציון המקסימלי *הבודד* הכי גבוה במערכת (לא ממוצע!)
-    let maxSegScoreInSystem = 0;
-    results.forEach(r => {
-        r.segments.forEach(s => {
-            if (s.commScore > maxSegScoreInSystem) maxSegScoreInSystem = s.commScore;
-        });
-    });
-
-    // 3. מבצעים נרמול *רק* אם הציון הכי גבוה במערכת הוא עדיין נמוך (מתחת ל-70)
-    // זה פותר את הבעיה: אם מסלול א' קיבל 100 במקטע 1, לא ניגע בציונים של אף אחד.
-    if (maxSegScoreInSystem > 0 && maxSegScoreInSystem < LOW_COMM_THRESHOLD) {
-        const commFactor = TARGET_COMM_WINNER / maxSegScoreInSystem;
-
-        results.forEach(res => {
-            res.segments.forEach(seg => {
-                if (seg.commScore) {
-                    seg.commScore = Math.min(100, seg.commScore * commFactor);
-                }
-            });
-        });
-    }
-    // -------------------------------------------------------
-
-    return results; // זוהי שורת הסיום של הפונקציה
 }
 
 
-
-// הגדרת המבנה לשמירת תרחיש (JSON)
-interface GeoVisScenario {
-    version: number;
-    meta: { name: string; createdAt: string };
-    mapState: { center: { lng: number; lat: number }; zoom: number; pitch: number; bearing: number };
-    routes: {
-        start: LngLat | null;
-        end: LngLat | null;
-        tripleLines: Record<"A" | "B" | "C", LngLat[]>;
-        routeScores?: any[];
-        selectedRoute?: "A" | "B" | "C";
-    };
-    entities: {
-        traffic: { id: string; coords: LngLat[] }[];
-        toll: { id: string; coords: LngLat[] }[];
-        comm: { id: string; ring: LngLat[]; radiusM: number }[];
-        parks: any[];
-    };
-    task: any; // אפשר לפרט יותר אם צריך
-    config: any;
-}
 // =========================
 // ✅ Visualizations Modal (additional component, non-invasive)
 // =========================
@@ -4159,15 +4056,6 @@ function createWideBadge(width: 120, height: 20): ImageData {
 export default function App() {
     const mapDivRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<maplibregl.Map | null>(null);
-    // --- משתני State חדשים לייצוא ---
-    const [exportStatus, setExportStatus] = useState<string | null>(null);
-    
-    // ניהול הצ'קבוקסים (מחליף את exportVizType הישן)
-    const [exportVizSelection, setExportVizSelection] = useState({
-        STACKED: true,
-        RADAR: true,
-        HEATMAP: true
-    });
 
     const [mapStyleTick, setMapStyleTick] = useState(0);
 
@@ -4246,13 +4134,13 @@ export default function App() {
         }
         return out;
     }, []);
+    // --- Satellite / Orthophoto Toggle Effect (FIXED) ---
     // --- Satellite / Orthophoto Toggle Effect (FIXED & ROBUST) ---
-    // --- Satellite / Orthophoto Toggle Effect (Robust Visibility Method) ---
     useEffect(() => {
         const map = mapRef.current;
         if (!map || !map.isStyleLoaded()) return;
 
-        // 1. הוספת מקור הלוויין אם לא קיים
+        // 1. הוספת המקור (Source) אם אינו קיים
         if (!map.getSource("satellite-source")) {
             map.addSource("satellite-source", {
                 type: "raster",
@@ -4261,38 +4149,45 @@ export default function App() {
             });
         }
 
-        // 2. הוספת שכבת הלוויין בתחתית
+        // 2. הוספת השכבה (Layer) בתחתית הערימה
         if (!map.getLayer("satellite-layer")) {
+            // חיפוש השכבה הראשונה שהיא לא רקע (כדי לשתול את הלוויין ממש מעל הרקע הבסיסי)
             const layers = map.getStyle().layers || [];
             let firstSymbolId = undefined;
+
+            // ננסה למצוא שכבה בטוחה להכניס מתחתיה
             for (const l of layers) {
                 if (l.type !== 'background') {
                     firstSymbolId = l.id;
                     break;
                 }
             }
+
             map.addLayer(
                 {
                     id: "satellite-layer",
                     type: "raster",
                     source: "satellite-source",
-                    paint: { "raster-opacity": 0 }, 
+                    paint: {
+                        "raster-opacity": 0,
+                        "raster-fade-duration": 300 // מעבר חלק
+                    },
                 },
-                firstSymbolId
+                firstSymbolId // מכניס את הלוויין מתחת לכל השכבות הווקטוריות
             );
         }
 
         const isSat = mapStyleType === "satellite";
+        const targetOpacity = isSat ? 0 : 1; // 0 = הסתרת וקטורים במצב לוויין
 
-        // 3. הצגה/הסתרה של הלוויין עצמו
+        // 3. הצגת הלוויין
         map.setPaintProperty("satellite-layer", "raster-opacity", isSat ? 1 : 0);
 
-        // 4. כיבוי והדלקה של שכבות וקטוריות
-        // במקום לשנות צבעים/שקיפות (שגורם לבעיות בחזרה), אנחנו משנים visibility.
+        // 4. ניהול שכבות וקטוריות (מסתירים את ה"רצפה" כדי לראות את הלוויין, משאירים כבישים)
         const style = map.getStyle();
         if (style && style.layers) {
             style.layers.forEach((layer: any) => {
-                // דילוג על השכבות שאנחנו יצרנו באפליקציה (מסלולים, מרקרים וכו')
+                // לא נוגעים בשכבות שאנחנו יצרנו (מסלולים, סמנים וכו')
                 if (
                     layer.id === "satellite-layer" ||
                     layer.id.startsWith("triple-") ||
@@ -4301,39 +4196,47 @@ export default function App() {
                     layer.id.startsWith("manual-") ||
                     layer.id.startsWith("cat-") ||
                     layer.id.startsWith("start-") ||
-                    layer.id.startsWith("end-") || 
+                    layer.id.startsWith("end-") ||
                     layer.id.startsWith("edit-")
                 ) {
                     return;
                 }
 
-                // זיהוי שכבות שצריך להעלים במצב לוויין (רקע, מילוי שטחים, מבנים)
-                // אנחנו משאירים 'line' (כבישים) ו-'symbol' (טקסטים) דלוקים תמיד ליצירת מפה היברידית
-                const shouldHide = 
-                    layer.type === 'background' || 
-                    layer.type === 'fill' || 
-                    layer.type === 'fill-extrusion' || 
-                    layer.type === 'landcover';
+                // רשימת סוגי שכבות שצריך להחליש/להעלים במצב לוויין
+                // אנחנו רוצים להעלים: רקע (background), שטחי אדמה (fill), מים (fill)
+                // אנחנו רוצים להשאיר: כבישים (line), טקסטים (symbol)
 
-                // חריג: לא להעלים כבישים גם אם הם מסוג fill (נדיר אך קורה בצמתים)
-                if (shouldHide && !layer.id.includes('road') && !layer.id.includes('transit')) {
-                    // השינוי הקריטי: שימוש ב-visibility במקום opacity
-                    // זה שומר על ההגדרות המקוריות של המפה כשהיא חוזרת ל-visible
-                    const targetVisibility = isSat ? 'none' : 'visible';
-                    
-                    // בדיקה האם הערך כבר מוגדר כדי למנוע הבהובים מיותרים
-                    if (map.getLayoutProperty(layer.id, 'visibility') !== targetVisibility) {
-                        map.setLayoutProperty(layer.id, 'visibility', targetVisibility);
+                if (layer.type === 'background') {
+                    map.setPaintProperty(layer.id, "background-opacity", targetOpacity);
+                }
+                else if (layer.type === 'fill' || layer.type === 'fill-extrusion') {
+                    // בדיקה מיוחדת: לא להעלים כבישים אם הם מוגדרים כ-fill (נדיר ב-streets-v2 אבל קורה)
+                    if (!layer.id.includes('road') && !layer.id.includes('transit')) {
+                        const propName = layer.type === 'fill' ? "fill-opacity" : "fill-extrusion-opacity";
+                        map.setPaintProperty(layer.id, propName, targetOpacity);
                     }
                 }
-                
-                // לגבי טקסטים (Symbols):
-                // בגרסה הקודמת שינינו להם צבע וזה נתקע. בגרסה הזו אנחנו *לא נוגעים* בהם.
-                // הטקסט המקורי של המפה יישאר כמו שהוא. ברוב המפות יש לו הילה (Halo) לבנה או שחורה,
-                // וזה אמור להיראות טוב גם על לוויין וגם על וקטור בלי לשבור את העיצוב בחזרה.
+
+                // התאמת טקסטים (צבע לבן במצב לוויין כדי שיהיה קריא)
+                if (layer.type === 'symbol') {
+                    try {
+                        // אם במצב לוויין -> הילה שחורה חזקה וטקסט לבן. אם רגיל -> איפוס (שימוש בצבעי המקור קשה לשחזור אז נשתמש בדיפולט שחור)
+                        if (isSat) {
+                            map.setPaintProperty(layer.id, "text-color", "#ffffff");
+                            map.setPaintProperty(layer.id, "text-halo-color", "#000000");
+                            map.setPaintProperty(layer.id, "text-halo-width", 1.5);
+                        } else {
+                            // שחזור צבעים (זה טריקי כי לכל שכבה צבע משלה, אז נחזיר לדיפולט סביר של המפה הכהה שלך)
+                            // בגלל שהמפה שלך כהה במקור, לבן עובד גם שם, אז אפשר פשוט להשאיר או להחזיר למה שהיה.
+                            // כדי למנוע באגים של "טקסט נעלם", נעשה ריענון עדין:
+                            map.setPaintProperty(layer.id, "text-halo-width", 1);
+                            // הערה: שחזור מדויק של צבע מקור דורש שמירת ה-state הקודם.
+                            // הפתרון הכי פשוט: אם המפה המקורית כהה, לבן זה מצוין גם לה.
+                        }
+                    } catch (e) { }
+                }
             });
         }
-
     }, [mapStyleType]);
 
 
@@ -4401,7 +4304,7 @@ export default function App() {
     const TASK_MODE_OPTIONS: TaskMode[] = ["Elimination", "Weighted", "Lexicographic"];
 
     // גלובלי: קטגוריה ראשית/משנית + תחום המקטעים
-    const [taskPrimaryCat, setTaskPrimaryCat] = useState<TaskCat>("נופי");
+    const [taskPrimaryCat, setTaskPrimaryCat] = useState<TaskCat>("מחובר");
     const [taskPrimaryScope, setTaskPrimaryScope] = useState<TaskScope>("כל המקטעים");
     const [taskSecondaryCat, setTaskSecondaryCat] = useState<TaskCat>("None");
 
@@ -4635,8 +4538,7 @@ export default function App() {
         "בחר את המסלול המיטבי לאור הדרישות. ניתן לעיין במפה ובפירוט המקטעים למטה לפני קבלת החלטה."
     );
     const [exportRequirementsText, setExportRequirementsText] = useState<string>("");
-    // State עבור בחירת סוגי הויזואליזציה (Multi-select)
- 
+    const [exportVizType, setExportVizType] = useState<ExportVizType>("STACKED");
     const [exportRecommendedRoute, setExportRecommendedRoute] = useState<"A" | "B" | "C">("A");
 
     const [exportSaveMode, setExportSaveMode] = useState<ExportSaveMode>("downloads");
@@ -5319,8 +5221,6 @@ export default function App() {
             style: STYLE_URL,
             center: [34.7818, 32.0853],
             zoom: 13.8,
-            // @ts-ignore
-            preserveDrawingBuffer: true // חובה לייצוא תמונה!
         });
 
         // Silence missing images
@@ -5456,7 +5356,6 @@ export default function App() {
 
                     const cur = badgesRef.current;
                     const next = cur.map((x) => (x.id === draggingId ? { ...x, coord: clamped } : x));
-                    badgesRef.current = next;
                     setBadges(next);
                     updateBadgeOnMap(next);
                 });
@@ -5519,7 +5418,7 @@ export default function App() {
                         addManualParkMarker(newPark);
 
                         showToast("הפארק הועתק לעריכה ידנית בהצלחה!");
-                        //setIsPickingPark(false);
+                        setIsPickingPark(false);
                     } else {
                         showToast("לא ניתן לחלץ גיאומטריה מפארק זה.");
                     }
@@ -6661,14 +6560,6 @@ export default function App() {
         URL.revokeObjectURL(url);
     }, []);
 
-    const handleBadgeDragEnd = (id: string, lng: number, lat: number) => {
-    setBadges((prevBadges) => 
-        prevBadges.map((b) => 
-            b.id === id ? { ...b, location: [lng, lat] } : b
-        )
-    );
-};
-
     const exportDebugLog = useCallback(() => {
         const map = mapRef.current;
         const center = map?.getCenter ? map.getCenter() : null;
@@ -6680,7 +6571,7 @@ export default function App() {
             scenarioName: exportScenarioName,
             taskText: exportTaskText,
             recommendedRoute: exportRecommendedRoute,
-            vizType: "STACKED",
+            vizType: exportVizType,
             mapView: map
                 ? {
                     center: center ? ([center.lng, center.lat] as LngLat) : null,
@@ -6747,7 +6638,7 @@ export default function App() {
         exportTaskText,
         exportRequirementsText,
         exportRecommendedRoute,
-        "STACKED",
+        exportVizType,
         start,
         end,
         selectedRoute,
@@ -6856,8 +6747,6 @@ export default function App() {
         taskDifficulty, taskMode, taskWPrimary, taskWSecondary, taskWTime, taskGateMinFrac, taskTieBreaker, taskFavorRoute,
         taskWinnerRoute, taskWinnerNote, diversity, scatterDensity, targetTimeGap, keepManualEntities, lang, downloadBlobAsFile, showToast
     ]);
-
-    // פונקציה לעדכון מיקום התגית לאחר גרירה
 
     const handleLoadScenario = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -6987,180 +6876,153 @@ export default function App() {
 
     }, [mapRef, start, end, selectedRoute, showToast]);
 
-    const exportParticipantHtml = async () => {
+    const exportParticipantHtml = useCallback(async () => {
         const map = mapRef.current;
         if (!map) {
             alert("המפה עדיין לא מוכנה.");
             return;
         }
 
-        setExportStatus("ממתין לטעינת מפה מלאה...");
+        // Capture an offline base-map snapshot
+        const EXPORT_HIDE_LAYERS: string[] = [
+            'triple-a', 'triple-b', 'triple-c', 'triple-a-outline', 'triple-b-outline', 'triple-c-outline',
+            'triple-badge-lines', 'triple-badges', 'triple-badge-text',
+            'triple-seg-ticks', 'triple-seg-circles', 'triple-seg-text',
+            'cat-traffic', 'cat-traffic-glow',
+            'cat-toll', 'cat-toll-label-bg', 'cat-toll-label-text',
+            'cat-comm-fill', 'cat-comm-outline',
+            'manual-parks-fill', 'manual-parks-outline',
+            'start-circle', 'end-pin', 'start-label-bg', 'end-label-bg', 'start-label', 'end-label',
+        ];
 
-        // --- תיקון אולטימטיבי: המתנה למצב 'idle' ---
-        // 'idle' אומר: "סיימתי לטעון את כל האריחים, וסיימתי לצייר הכל".
-        
-        if (!map.loaded()) {
-             // אם המפה עדיין טוענת משהו, נחכה לאירוע הסיום
-             await new Promise<void>(resolve => map.once('idle', resolve));
+        const prevVis = new Map<string, any>();
+        for (const id of EXPORT_HIDE_LAYERS) {
+            try {
+                if (map.getLayer(id)) prevVis.set(id, map.getLayoutProperty(id, 'visibility'));
+            } catch { }
+        }
+        for (const id of EXPORT_HIDE_LAYERS) {
+            try {
+                if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
+            } catch { }
         }
 
-        // ליתר ביטחון: מכריחים ציור אחרון ומחכים לו
-        map.triggerRepaint();
-        await new Promise<void>(resolve => map.once('render', resolve));
+        await new Promise<void>((res) => {
+            try {
+                map.once('idle', () => res());
+                map.triggerRepaint();
+            } catch {
+                res();
+            }
+        });
 
-        // כעת המפה בטוח מוכנה
-        const canvas = map.getCanvas();
-        
-        let baseMapDataUrl = "";
-        // Temporarily hide overlay layers (routes, edits, measures) so the snapshot contains only the base map
+        let baseMapDataUrl = '';
         try {
-            const style = map.getStyle();
-            const overlayLayerIds: string[] = (Array.isArray(style?.layers) ? style.layers : [])
-                .filter((l: any) => isOverlayLayerId(String(l.id || "")))
-                .map((l: any) => String(l.id || ""));
+            baseMapDataUrl = map.getCanvas().toDataURL('image/png');
+        } catch {
+            baseMapDataUrl = '';
+        }
+        if (baseMapDataUrl && baseMapDataUrl.length < 2000) baseMapDataUrl = "";
 
-            const prevVisibility: Record<string, string> = {};
-            for (const id of overlayLayerIds) {
-                try {
-                    const cur = map.getLayoutProperty(id, "visibility") as string | undefined;
-                    prevVisibility[id] = cur === undefined ? "visible" : cur;
-                    map.setLayoutProperty(id, "visibility", "none");
-                } catch { }
-            }
-
-            // Ensure a repaint so the hidden layers are not present in the canvas
-            try { map.triggerRepaint(); } catch { }
-            await new Promise<void>((resolve) => {
-                let done = false;
-                const onRender = () => {
-                    if (done) return;
-                    done = true;
-                    try { map.off('render', onRender); } catch { }
-                    resolve();
-                };
-                try { map.once('render', onRender); } catch { setTimeout(resolve, 150); }
-                setTimeout(() => { if (!done) { done = true; try { map.off('render', onRender); } catch { } resolve(); } }, 500);
-            });
-
-            // @ts-ignore
-            baseMapDataUrl = canvas.toDataURL("image/png");
-
-            // restore visibilities
-            for (const id of Object.keys(prevVisibility)) {
-                try { map.setLayoutProperty(id, "visibility", prevVisibility[id]); } catch { }
-            }
-
-            // give map a chance to repaint back
-            try { map.triggerRepaint(); } catch { }
-
-        } catch (e) {
-            console.error("Export failed", e);
-            alert("שגיאת אבטחה (CORS): השרת של המפה חוסם ייצוא תמונה. נסה להחליף סגנון מפה.");
-            return;
+        // restore visibility
+        for (const id of EXPORT_HIDE_LAYERS) {
+            try {
+                if (map.getLayer(id)) {
+                    const v = prevVis.has(id) ? prevVis.get(id) : 'visible';
+                    map.setLayoutProperty(id, 'visibility', v ?? 'visible');
+                }
+            } catch { }
         }
 
-        // --- המשך הקוד הרגיל שלך... ---
-        const w = canvas.width;
-        const h = canvas.height;
-        const center = map.getCenter();
-        const zoom = map.getZoom();
-        
-        // --- תיקון קריטי: שליפת הנתונים הכי עדכניים מה-Refs ---
-        const currentRoutes = tripleLinesRef.current; 
-        const currentBadges = badgesRef.current; // שימוש ב-Ref המעודכן (מהתיקון למעלה)
-        const currentParks = manualParksRef.current;
-        const currentTraffic = catTrafficSegsRef.current;
-        const currentToll = catTollSegsRef.current;
-        const currentComm = catCommZonesRef.current;
+        let canvas = map.getCanvas();
+        let viewW = canvas.width;
+        let viewH = canvas.height;
 
-        // חישוב מחדש של הנתונים כדי שישקפו עריכות מסלול אחרונות
-        const freshScores = computeRouteScores(
-            map,
-            currentRoutes,
-            currentTraffic,
-            currentToll,
-            currentComm,
-            currentParks
-        );
+        // Fallback capture logic omitted for brevity (it's fine as is in your code)
+        // ...
 
-        // המרת הציונים לפורמט שטוח עבור ה-HTML
-        const flatScores = freshScores.flatMap(r => r.segments.map(s => ({...s, route: r.route})));
-
-        // החלפנו ב-any זמנית
-        const tasks: { type: any, suffix: string }[] = [];
-        if (exportVizSelection.STACKED) tasks.push({ type: "STACKED", suffix: "S" });
-        if (exportVizSelection.RADAR) tasks.push({ type: "RADAR", suffix: "R" });
-        if (exportVizSelection.HEATMAP) tasks.push({ type: "HEATMAP", suffix: "H" });
-
-        if (tasks.length === 0) {
-            alert("אנא בחר לפחות סוג ויזואליזציה אחד לייצוא.");
-            return;
-        }
-
-        setExportStatus("מכין מפה...");
-        const baseName = safeFileName(exportScenarioName || "Scenario");
-        
-        // הגדרות תצוגה
+        const c = map.getCenter();
         const mapView = {
-            center: [center.lng, center.lat] as LngLat,
-            zoom: zoom,
+            center: [c.lng, c.lat] as LngLat,
+            zoom: map.getZoom(),
             bearing: 0,
             pitch: 0,
-            width: w,
-            height: h,
+            width: viewW,
+            height: viewH,
         };
 
-        // טיפול בשמירה לתיקייה (אם נתמך)
-        let dirHandle: any = null;
-        if (exportSaveMode === 'directory' && (window as any).showDirectoryPicker) {
-             if (exportDirHandle) dirHandle = exportDirHandle;
-        }
+        const getLine = (rid: "A" | "B" | "C") => {
+            const l = (tripleLinesRef.current as any)?.[rid] as LngLat[] | undefined;
+            return Array.isArray(l) ? l : [];
+        };
 
-        for (let i = 0; i < tasks.length; i++) {
-            const task = tasks[i];
-            setExportStatus(`מייצא קובץ ${i + 1} מתוך ${tasks.length} (${task.suffix})...`);
-            
-            const finalFileName = `${baseName}_${task.suffix}.html`;
+        const routes = {
+            A: getLine("A"),
+            B: getLine("B"),
+            C: getLine("C"),
+        } as const;
 
-            const htmlContent = buildParticipantHtml({
-                scenarioName: exportScenarioName,
-                taskText: exportTaskText,
-                requirementsText: exportRequirementsText,
-                recommendedRoute: exportRecommendedRoute,
-                vizType: task.type,
-                baseMapDataUrl,
-                mapView,
-                start,
-                end,
-                routes: currentRoutes,           // שימוש במסלולים הערוכים
-                routeScores: flatScores,         // שימוש בציונים המחושבים מחדש
-                badges: currentBadges,           // שימוש במיקומי התגיות המעודכנים
-                manualParks: currentParks,
-                catTrafficSegs: currentTraffic,
-                catTollSegs: currentToll,
-                catTollLabels,
-                catCommZones: currentComm,
-            });
+        const html = buildParticipantHtml({
+            scenarioName: exportScenarioName,
+            taskText: exportTaskText,
+            requirementsText: exportRequirementsText,
+            recommendedRoute: exportRecommendedRoute,
+            vizType: exportVizType,
+            baseMapDataUrl,
+            mapView,
+            start,
+            end,
+            routes,
+            manualParks: manualParksRef.current || [],
+            catTrafficSegs,
+            catTollSegs,
+            catTollLabels,
+            catCommZones,
+            routeScores: routeScores.flatMap(r => r.segments),
+            badges: badgesRef.current, // <--- התיקון כאן: העבר את badgesRef.current במקום []
+        });
 
-            try {
-                if (dirHandle) {
-                    const fileHandle = await dirHandle.getFileHandle(finalFileName, { create: true });
-                    const writable = await fileHandle.createWritable();
-                    await writable.write(htmlContent);
-                    await writable.close();
-                } else {
-                    downloadHtml(htmlContent, finalFileName);
-                    if (i < tasks.length - 1) await new Promise(r => setTimeout(r, 800));
-                }
-            } catch (err) {
-                console.error(`Failed to save ${finalFileName}`, err);
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const fileName = `${safeFileName(exportScenarioName)}_${stamp}.html`;
+
+        try {
+            if (exportSaveMode === "directory" && exportDirHandle) {
+                const dir: any = exportDirHandle as any;
+                const fileHandle = await dir.getFileHandle(fileName, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(html);
+                await writable.close();
+
+                const where = `${exportSavePath}/${fileName}`;
+                setExportLastSaved(where);
+                alert(`הקובץ נשמר בתיקייה שנבחרה: ${where}`);
+                return;
             }
-        }
+        } catch { }
 
-        setExportStatus(null);
-        setExportOpen(false);
-        showToast(`הייצוא הושלם! (${tasks.length} קבצים)`);
-    };
+        downloadHtml(html, fileName);
+        const where = `Downloads/${fileName}`;
+        setExportLastSaved(where);
+        alert(`הקובץ ירד כהורדה רגילה: ${where}`);
+    }, [
+        catCommZones,
+        catTollLabels,
+        catTollSegs,
+        catTrafficSegs,
+        downloadHtml,
+        end,
+        exportDirHandle,
+        exportRecommendedRoute,
+        exportSaveMode,
+        exportSavePath,
+        exportScenarioName,
+        exportTaskText,
+        exportRequirementsText,
+        exportVizType,
+        routeScores,
+        start,
+        // הוסף את badgesRef לרשימת התלויות אם ה-Linter דורש זאת, אך זה לא קריטי ב-useCallback עם Refs
+    ]);
 
     // פונקציה ליצירת תרחיש חכם מבוסס מטלה
     const generateSmartEntities = useCallback(() => {
@@ -7317,7 +7179,7 @@ export default function App() {
     // ...
 
     return (
-        <div style={{ display: "flex", width: "100vw", height: "100%", overflow: "hidden", fontFamily: "Arial, sans-serif !important"}}>
+        <div style={{ display: "flex", width: "100vw", height: "100vh", overflow: "hidden" }}>
             {/* --- תדביק את זה כאן, מיד בהתחלה --- */}
             <style>{`
                 * {
@@ -7684,72 +7546,38 @@ export default function App() {
                 }}
             >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    {/* --- התחלת הבלוק החדש: כפתורי ניהול (JSON + טעינה) --- */}
-                    <div style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "center" }}>
-                    <div style={{ fontWeight: 900, fontSize: 22, marginRight: 10, fontFamily: "Arial, sans-serif"}}>תכנון תרחיש</div>            
-   
-                        {/* 1. כפתור JSON (החדש) */}
-                        <button
-                            onClick={() => exportDebugLog()}
-                            title="ייצוא לוג מלא לדיבאג (JSON)"
-                            style={{
-                                background: "rgba(140, 203, 255, 0.15)",
-                                border: "1px solid rgba(140, 203, 255, 0.3)",
-                                borderRadius: 6,
-                                color: "#8ccbff",
-                                cursor: "pointer",
-                                padding: "0 8px", // קצת יותר קומפקטי
-                                fontSize: 11,
-                                fontWeight: "bold",
-                                height: 32, // גובה אחיד
-                                whiteSpace: "nowrap",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center"
-                            }}
-                        >
-                            JSON ⇩
-                        </button>
+                    <div style={{ fontWeight: 900, fontSize: 18 }}>GeoVis Lab</div>
 
-                        {/* 2. כפתור טעינת תרחיש (המקורי - עטוף מחדש) */}
-                        <label
+                    {/* כפתור ייבוא (טעינה) */}
+                    <div>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{ display: "none" }}
+                            accept=".json"
+                            onChange={handleLoadScenario}
+                        />
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            title="טען תרחיש שמור (JSON)"
                             style={{
-                                flex: 1, // תופס את שאר הרוחב
                                 background: "rgba(255,255,255,0.1)",
                                 border: "1px solid rgba(255,255,255,0.2)",
                                 borderRadius: 6,
-                                color: "white",
+                                color: "#e8eefc",
                                 cursor: "pointer",
-                                padding: "0 12px",
-                                fontSize: 13,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                height: 32,
-                                textAlign: "center",
-                                fontWeight: 600
+                                padding: "4px 8px",
+                                display: "flex", alignItems: "center", justifyContent: "center"
                             }}
                         >
-                            <span style={{ marginLeft: 6 }}>📂</span>
-                            טעינת תרחיש
-                            <input
-                                        type="file"
-                                        accept=".json"
-                                        onChange={(e) => {
-                                            // בדיקה שיש קובץ
-                                            if (e.target.files?.[0]) {
-                                                // 1. קריאה לפונקציה בשם הנכון (כפי שהגדרנו למעלה)
-                                                handleLoadScenario(e);
-                                                
-                                                // 2. איפוס האינפוט כדי שאפשר יהיה לטעון את אותו קובץ שוב
-                                                e.target.value = ""; 
-                                            }
-                                        }}
-                                        style={{ display: "none" }}
-                                    />
-                        </label>
+                            {/* אייקון טעינה - חץ למטה */}
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                        </button>
                     </div>
-                    {/* --- סוף הבלוק החדש --- */}
                 </div>
                 {/* Map data row */}
                 <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
@@ -7980,13 +7808,13 @@ export default function App() {
                         {mode === "SINGLE" && (
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                                 <span>נקודות: <b>{singleWaypoints.length}</b>, מרחק: <b>{fmtDistance(singleDist)}</b></span>
-                                <button onClick={clearSingle} style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(255,255,255,0.1)", color: "white", border: "none", cursor: "pointer" }}>ניקוי 🗑️</button>
+                                <button onClick={clearSingle} style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(255,255,255,0.1)", color: "white", border: "none", cursor: "pointer" }}>ניקוי</button>
                             </div>
                         )}
                         {mode === "MEASURE" && (
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                                 <span>מרחק מצטבר: <b>{fmtDistance(measureDist)}</b></span>
-                                <button onClick={clearMeasure} style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(255,255,255,0.1)", color: "white", border: "none", cursor: "pointer" }}>ניקוי 🗑️</button>
+                                <button onClick={clearMeasure} style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(255,255,255,0.1)", color: "white", border: "none", cursor: "pointer" }}>ניקוי</button>
                             </div>
                         )}
                     </div>
@@ -8071,7 +7899,7 @@ export default function App() {
                                     }}
                                     title="נקה את כל המסלולים/מדידה"
                                 >
-                                    ניקוי 🗑️
+                                    ניקוי
                                 </button>
                             </div>
 
@@ -8224,7 +8052,6 @@ export default function App() {
                             </div>
 
                             {/* רשימת הקטגוריות - שורות במקום כרטיסיות */}
-                            {/* רשימת הקטגוריות - מעודכן עם אייקון כביש אגרה כפול */}
                             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                                 {[
                                     { key: "traffic", title: "עומס תנועה" },
@@ -8242,62 +8069,17 @@ export default function App() {
                                             borderBottom: idx < arr.length - 1 ? "1px solid rgba(255,255,255,0.1)" : "none",
                                         }}
                                     >
-                                        {/* צד ימין: אייקון + כותרת */}
-                                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                            
-                                            {/* --- אייקון ייחודי לכל סוג --- */}
-                                            <div style={{ width: 24, display: "flex", justifyContent: "center", alignItems: "center" }}>
-                                                
-                                                {c.key === "traffic" && (
-                                                    <svg width="24" height="6" viewBox="0 0 24 6">
-                                                        <line x1="0" y1="3" x2="24" y2="3" stroke="#ef4444" strokeWidth="3" strokeDasharray="4 2" />
-                                                    </svg>
-                                                )}
+                                        <div style={{ fontWeight: 800, fontSize: 14 }}>{c.title}</div>
 
-                                                {/* --- כביש אגרה: 2 קווים צהובים --- */}
-                                                {c.key === "toll" && (
-                                                    <div style={{ position: "relative", width: 24, height: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                                        {/* קו עליון */}
-                                                        <div style={{ position: "absolute", top: 2, width: "100%", height: 2, background: "#fbbf24" }}></div>
-                                                        {/* קו תחתון */}
-                                                        <div style={{ position: "absolute", bottom: 2, width: "100%", height: 2, background: "#fbbf24" }}></div>
-                                                        
-                                                        {/* עיגול עם ש"ח */}
-                                                        <div style={{ 
-                                                            zIndex: 1, width: 14, height: 14, borderRadius: "50%", 
-                                                            background: "#fbbf24", border: "1px solid rgba(0,0,0,0.5)",
-                                                            display: "flex", alignItems: "center", justifyContent: "center",
-                                                            color: "black", fontSize: 9, fontWeight: "bold", lineHeight: 1,
-                                                            fontFamily: "Arial, sans-serif"
-                                                        }}>₪</div>
-                                                    </div>
-                                                )}
-
-                                                {c.key === "comm" && (
-                                                    <svg width="18" height="18" viewBox="0 0 18 18">
-                                                        <circle cx="9" cy="9" r="6" stroke="#a855f7" strokeWidth="2" fill="none" />
-                                                        <circle cx="9" cy="9" r="2" fill="#a855f7" />
-                                                    </svg>
-                                                )}
-
-                                                {c.key === "park" && (
-                                                    <svg width="18" height="18" viewBox="0 0 18 18">
-                                                        <rect x="2" y="2" width="14" height="14" rx="2" fill="#c7e6c5" stroke="#2e7d32" strokeWidth="2" />
-                                                    </svg>
-                                                )}
-                                            </div>
-
-                                            <div style={{ fontWeight: 800, fontSize: 14 }}>{c.title}</div>
-                                        </div>
-
-                                        {/* צד שמאל: כפתורים */}
                                         <div style={{ display: "flex", gap: 8 }}>
+                                            {/* כפתור הוספה (רגיל) */}
                                             <button
                                                 onClick={() => {
                                                     setDeleteCatMode(null);
                                                     setDraftEntityPts([]);
                                                     setDraftCommCenter(null);
                                                     
+                                                    // איפוס מצב דגירה אם עוברים למשהו אחר
                                                     if (c.key !== "park") setIsPickingPark(false);
 
                                                     if (c.key === "park") {
@@ -8321,6 +8103,7 @@ export default function App() {
                                                     padding: "6px 10px",
                                                     borderRadius: 8,
                                                     border: "1px solid rgba(255,255,255,0.15)",
+                                                    // צבע מיוחד לכפתור הציור של הפארק
                                                     background: (c.key === "park" && isDrawingPark) ? "rgba(46,204,113,0.25)" : "rgba(17, 134, 255, 0.2)",
                                                     color: "white",
                                                     fontSize: 13,
@@ -8331,7 +8114,7 @@ export default function App() {
                                                 {(c.key === "park" && isDrawingPark) ? "סיים" : "הוסף"}
                                             </button>
 
-                                            {/* כפתור דגירה - רק לפארקים */}
+                                            {/* --- כפתור חדש: דגירה מהמפה (רק לפארקים) --- */}
                                             {c.key === "park" && (
                                                 <button
                                                     onClick={() => {
@@ -8358,6 +8141,7 @@ export default function App() {
                                                 </button>
                                             )}
 
+                                            {/* כפתור מחיקה */}
                                             <button
                                                 onClick={() => {
                                                     setEntityDrawMode(null);
@@ -9219,66 +9003,27 @@ export default function App() {
                                 </div>
 
                                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                                    {/* --- בחירת סוגי ויזואליזציה (Checkboxes) --- */}
-                                    <div style={{ marginBottom: 16 }}>
-                                        <label style={{ display: "block", marginBottom: 8, fontSize: 14, fontWeight: 600 }}>
-                                            סוגי ויזואליזציה לייצוא:
-                                        </label>
-                                        <div style={{ 
-                                            display: "flex", 
-                                            flexDirection: "column", 
-                                            gap: 8,
-                                            background: "rgba(0,0,0,0.2)",
-                                            padding: 10,
-                                            borderRadius: 8
-                                        }}>
-                                            {/* כפתור "בחר הכל" */}
-                                            <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontWeight: "bold", paddingBottom: 6, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={exportVizSelection.STACKED && exportVizSelection.RADAR && exportVizSelection.HEATMAP}
-                                                    onChange={(e) => {
-                                                        const val = e.target.checked;
-                                                        setExportVizSelection({ STACKED: val, RADAR: val, HEATMAP: val });
-                                                    }}
-                                                    style={{ marginLeft: 8 }}
-                                                />
-                                                בחר הכל (All)
-                                            </label>
-
-                                            {/* Stacked */}
-                                            <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={exportVizSelection.STACKED}
-                                                    onChange={(e) => setExportVizSelection(prev => ({ ...prev, STACKED: e.target.checked }))}
-                                                    style={{ marginLeft: 8 }}
-                                                />
-                                                גרף עמודות (Stacked) - סיומת S
-                                            </label>
-
-                                            {/* Radar */}
-                                            <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={exportVizSelection.RADAR}
-                                                    onChange={(e) => setExportVizSelection(prev => ({ ...prev, RADAR: e.target.checked }))}
-                                                    style={{ marginLeft: 8 }}
-                                                />
-                                                גרף רדאר (Radar) - סיומת R
-                                            </label>
-
-                                            {/* Table (Heatmap internal) */}
-                                            <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={exportVizSelection.HEATMAP}
-                                                    onChange={(e) => setExportVizSelection(prev => ({ ...prev, HEATMAP: e.target.checked }))}
-                                                    style={{ marginLeft: 8 }}
-                                                />
-                                                טבלה (Table) - סיומת H
-                                            </label>
-                                        </div>
+                                    <div style={{ flex: 1, minWidth: 220 }}>
+                                        <div style={{ fontWeight: 800, marginBottom: 6 }}>תנאי ויזואליזציה</div>
+                                        <select
+                                            value={exportVizType}
+                                            onChange={(e) => setExportVizType(e.target.value as ExportVizType)}
+                                            style={{
+                                                width: "100%",
+                                                padding: "10px 12px",
+                                                borderRadius: 10,
+                                                border: "1px solid rgba(255,255,255,0.15)",
+                                                background: "rgba(0,0,0,0.25)",
+                                                color: "#e8eefc", // <--- טקסט לבן בשדה
+                                                outline: "none",
+                                                fontFamily: "Arial, sans-serif",
+                                            }}
+                                        >
+                                            {/* עיצוב כהה לאפשרויות ברשימה */}
+                                            <option value="STACKED" style={{ background: "#1e293b", color: "#e8eefc" }}>גרף בר נערם</option>
+                                            <option value="RADAR" style={{ background: "#1e293b", color: "#e8eefc" }}>גרף רדאר</option>
+                                            <option value="HEATMAP" style={{ background: "#1e293b", color: "#e8eefc" }}>טבלת מפת חום</option>
+                                        </select>
                                     </div>
 
                                     <div style={{ flex: 1, minWidth: 220 }}>
@@ -9475,7 +9220,31 @@ export default function App() {
 
                 <div style={{ fontSize: 12, opacity: 0.65 }}>טיפ: בחר מסלול א/ב/ג בפאנל כדי להציג עליו את חלוקת המקטעים.</div>
 
-                
+                {/* תמיד גלוי: ייצוא לוג JSON לדיבאג */}
+                <button
+                    onClick={() => exportDebugLog()}
+                    title="ייצוא לוג (JSON)"
+                    style={{
+                        position: "fixed",
+                        bottom: 12,
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        zIndex: 10001,
+                        padding: "10px 14px",
+                        borderRadius: 999,
+                        border: "1px solid rgba(255,255,255,0.18)",
+                        background: "rgba(140,203,255,0.22)",
+                        color: "#e8eefc",
+                        fontFamily: "Arial, sans-serif",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        boxShadow: "0 8px 22px rgba(0,0,0,0.32)",
+                        backdropFilter: "blur(8px)",
+                        WebkitBackdropFilter: "blur(8px)",
+                    }}
+                >
+                    לוג (JSON)
+                </button>
 
             </div>
         </div>

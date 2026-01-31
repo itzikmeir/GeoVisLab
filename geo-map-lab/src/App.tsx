@@ -89,12 +89,8 @@ function App() {
               <a href="https://www.youtube.com/results?search_query=rick+roll+1000+hours" target="_blank" rel="noreferrer" onClick={closeMenu} style={menuItemStyle}>
                 ⚙️ הגדרות 
               </a>
-
-              {/* קו מפריד */}
-              <div style={{ height: '1px', background: '#475569', margin: '5px 0' }}></div>
-
-              {/* --- עזרה ואודות --- */}
-              
+    
+          
               {/* כפתור עזרה - פותח לשונית חדשה */}
               <a 
                 href="/GeoVisLab/help.html" 

@@ -554,7 +554,6 @@ function drawMap() {
     // ציור תקשורת (Purple Zones)
     if(filters.comm) DATA.catCommZones.forEach(z => gComm.appendChild(mkPoly(z.ring, DATA.colors.comm.fill, DATA.colors.comm.outline)));
     
-    
     // ציור פארקים
     if(filters.parks) DATA.manualParks.forEach(p => gParks.appendChild(mkPoly(p.ring, DATA.colors.parks.fill, DATA.colors.parks.outline)));
     
@@ -3240,19 +3239,14 @@ function computeRouteScores(
             fracComm,
         };
     }
-    // ... (סוף הפונקציה scoreSegment) ...
-    // }
 
-    // 1. יצירת המערך הראשוני של התוצאות (במקום ה-return הישיר)
-    const results = routes.map((r) => {
+    return routes.map((r) => {
         const line = tripleLines[r] ?? [];
         if (line.length < 2) {
             return { route: r, segments: [], totalLengthM: 0, totalTimeS: 0 };
         }
 
-        // שימוש בפונקציית העזר הקיימת לפיצול ל-3
         const [s1, s2, s3] = split3ByIndices(line);
-        
         const segs: SegmentScore[] = [
             scoreSegment(r, 1, s1),
             scoreSegment(r, 2, s2),
@@ -3264,86 +3258,7 @@ function computeRouteScores(
 
         return { route: r, segments: segs, totalLengthM, totalTimeS };
     });
-
-    // --- שלב נרמול יחסי לפארקים (Intelligent Scaling) ---
-    // המטרה: אם למסלול הכי טוב יש ציון נמוך (למשל 15 מתוך 100),
-    // נמתח את הסקאלה כך שהוא יקבל ציון "יפה" (85) והשאר יגדלו יחסית אליו.
-
-    const TARGET_WINNER_SCORE = 85; // הציון שנרצה לתת למנצח (בסקאלה של 100)
-    const LOW_THRESHOLD = 40;       // סף הפעלה: רק אם המנצח קיבל פחות מזה
-
-    // פונקציית עזר לחישוב ציון פארקים כולל למסלול (ממוצע המקטעים)
-    const getRouteScenicScore = (res: RouteScore) => {
-        if (!res.segments.length) return 0;
-        return res.segments.reduce((sum, s) => sum + s.scenicScore, 0) / res.segments.length;
-    };
-
-    // 1. מציאת הציון הגבוה ביותר בקטגוריית הנוף כרגע
-    const maxRawScore = Math.max(...results.map(r => getRouteScenicScore(r)));
-
-    // 2. בדיקה האם צריך נרמול
-    if (maxRawScore > 0 && maxRawScore < LOW_THRESHOLD) {
-        // חישוב הפקטור
-        const factor = TARGET_WINNER_SCORE / maxRawScore;
-
-        // 3. עדכון הציונים של כל המסלולים בפקטור הזה
-        results.forEach(res => {
-            res.segments.forEach(seg => {
-                // עדכון הציון של המקטע (עם תקרה של 100)
-                seg.scenicScore = Math.min(100, seg.scenicScore * factor);
-            });
-        });
-    }
-    // -------------------------------------------------------
-    // ... (כאן נגמר הבלוק הקודם של נרמול הפארקים/scenery) ...
-
-    // --- נרמול יחסי לתקשורת (Communication Scaling) ---
-    // המטרה: אם כל המסלולים עם קליטה חלשה, נדגיש את ההבדלים ביניהם
-    // כך שהטוב מביניהם (ה"פחות גרוע") יקבל ציון גבוה.
-
-    // ... (אחרי נרמול הפארקים) ...
-
-    // --- נרמול יחסי לתקשורת (מתוקן) ---
-    const TARGET_COMM_WINNER = 95;
-    const LOW_COMM_THRESHOLD = 70; 
-
-    // 1. חישוב ראשוני + "עיגול למעלה" למקרים של כמעט 100%
-    results.forEach(res => {
-        res.segments.forEach(seg => {
-            // תיקון: אם הכיסוי מעל 90%, תן לו 100 עגול (מפצה על פספוסי דגימה בקצוות)
-            if (seg.fracComm && seg.fracComm > 0.90) {
-                seg.commScore = 100;
-            }
-        });
-    });
-
-    // 2. מציאת הציון המקסימלי *הבודד* הכי גבוה במערכת (לא ממוצע!)
-    let maxSegScoreInSystem = 0;
-    results.forEach(r => {
-        r.segments.forEach(s => {
-            if (s.commScore > maxSegScoreInSystem) maxSegScoreInSystem = s.commScore;
-        });
-    });
-
-    // 3. מבצעים נרמול *רק* אם הציון הכי גבוה במערכת הוא עדיין נמוך (מתחת ל-70)
-    // זה פותר את הבעיה: אם מסלול א' קיבל 100 במקטע 1, לא ניגע בציונים של אף אחד.
-    if (maxSegScoreInSystem > 0 && maxSegScoreInSystem < LOW_COMM_THRESHOLD) {
-        const commFactor = TARGET_COMM_WINNER / maxSegScoreInSystem;
-
-        results.forEach(res => {
-            res.segments.forEach(seg => {
-                if (seg.commScore) {
-                    seg.commScore = Math.min(100, seg.commScore * commFactor);
-                }
-            });
-        });
-    }
-    // -------------------------------------------------------
-
-    return results; // זוהי שורת הסיום של הפונקציה
 }
-
-
 
 // הגדרת המבנה לשמירת תרחיש (JSON)
 interface GeoVisScenario {
@@ -5319,8 +5234,6 @@ export default function App() {
             style: STYLE_URL,
             center: [34.7818, 32.0853],
             zoom: 13.8,
-            // @ts-ignore
-            preserveDrawingBuffer: true // חובה לייצוא תמונה!
         });
 
         // Silence missing images
@@ -6994,77 +6907,20 @@ export default function App() {
             return;
         }
 
-        setExportStatus("ממתין לטעינת מפה מלאה...");
-
-        // --- תיקון אולטימטיבי: המתנה למצב 'idle' ---
-        // 'idle' אומר: "סיימתי לטעון את כל האריחים, וסיימתי לצייר הכל".
-        
-        if (!map.loaded()) {
-             // אם המפה עדיין טוענת משהו, נחכה לאירוע הסיום
-             await new Promise<void>(resolve => map.once('idle', resolve));
-        }
-
-        // ליתר ביטחון: מכריחים ציור אחרון ומחכים לו
-        map.triggerRepaint();
-        await new Promise<void>(resolve => map.once('render', resolve));
-
-        // כעת המפה בטוח מוכנה
+        // 1. שמירת מצב נוכחי של התצוגה
         const canvas = map.getCanvas();
-        
-        let baseMapDataUrl = "";
-        // Temporarily hide overlay layers (routes, edits, measures) so the snapshot contains only the base map
-        try {
-            const style = map.getStyle();
-            const overlayLayerIds: string[] = (Array.isArray(style?.layers) ? style.layers : [])
-                .filter((l: any) => isOverlayLayerId(String(l.id || "")))
-                .map((l: any) => String(l.id || ""));
-
-            const prevVisibility: Record<string, string> = {};
-            for (const id of overlayLayerIds) {
-                try {
-                    const cur = map.getLayoutProperty(id, "visibility") as string | undefined;
-                    prevVisibility[id] = cur === undefined ? "visible" : cur;
-                    map.setLayoutProperty(id, "visibility", "none");
-                } catch { }
-            }
-
-            // Ensure a repaint so the hidden layers are not present in the canvas
-            try { map.triggerRepaint(); } catch { }
-            await new Promise<void>((resolve) => {
-                let done = false;
-                const onRender = () => {
-                    if (done) return;
-                    done = true;
-                    try { map.off('render', onRender); } catch { }
-                    resolve();
-                };
-                try { map.once('render', onRender); } catch { setTimeout(resolve, 150); }
-                setTimeout(() => { if (!done) { done = true; try { map.off('render', onRender); } catch { } resolve(); } }, 500);
-            });
-
-            // @ts-ignore
-            baseMapDataUrl = canvas.toDataURL("image/png");
-
-            // restore visibilities
-            for (const id of Object.keys(prevVisibility)) {
-                try { map.setLayoutProperty(id, "visibility", prevVisibility[id]); } catch { }
-            }
-
-            // give map a chance to repaint back
-            try { map.triggerRepaint(); } catch { }
-
-        } catch (e) {
-            console.error("Export failed", e);
-            alert("שגיאת אבטחה (CORS): השרת של המפה חוסם ייצוא תמונה. נסה להחליף סגנון מפה.");
-            return;
-        }
-
-        // --- המשך הקוד הרגיל שלך... ---
         const w = canvas.width;
         const h = canvas.height;
         const center = map.getCenter();
         const zoom = map.getZoom();
-        
+
+        let baseMapDataUrl = "";
+        try {
+            baseMapDataUrl = canvas.toDataURL("image/png");
+        } catch (e) {
+            console.warn("Canvas export failed", e);
+        }
+
         // --- תיקון קריטי: שליפת הנתונים הכי עדכניים מה-Refs ---
         const currentRoutes = tripleLinesRef.current; 
         const currentBadges = badgesRef.current; // שימוש ב-Ref המעודכן (מהתיקון למעלה)
@@ -7086,11 +6942,10 @@ export default function App() {
         // המרת הציונים לפורמט שטוח עבור ה-HTML
         const flatScores = freshScores.flatMap(r => r.segments.map(s => ({...s, route: r.route})));
 
-        // החלפנו ב-any זמנית
-        const tasks: { type: any, suffix: string }[] = [];
+        const tasks: { type: ExportVizType, suffix: string }[] = [];
         if (exportVizSelection.STACKED) tasks.push({ type: "STACKED", suffix: "S" });
         if (exportVizSelection.RADAR) tasks.push({ type: "RADAR", suffix: "R" });
-        if (exportVizSelection.HEATMAP) tasks.push({ type: "HEATMAP", suffix: "H" });
+        if (exportVizSelection.HEATMAP) tasks.push({ type: "HEATMAP", suffix: "T" });
 
         if (tasks.length === 0) {
             alert("אנא בחר לפחות סוג ויזואליזציה אחד לייצוא.");
@@ -9276,7 +9131,7 @@ export default function App() {
                                                     onChange={(e) => setExportVizSelection(prev => ({ ...prev, HEATMAP: e.target.checked }))}
                                                     style={{ marginLeft: 8 }}
                                                 />
-                                                טבלה (Table) - סיומת H
+                                                טבלה (Table) - סיומת T
                                             </label>
                                         </div>
                                     </div>

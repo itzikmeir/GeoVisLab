@@ -7012,47 +7012,9 @@ export default function App() {
         const canvas = map.getCanvas();
         
         let baseMapDataUrl = "";
-        // Temporarily hide overlay layers (routes, edits, measures) so the snapshot contains only the base map
         try {
-            const style = map.getStyle();
-            const overlayLayerIds: string[] = (Array.isArray(style?.layers) ? style.layers : [])
-                .filter((l: any) => isOverlayLayerId(String(l.id || "")))
-                .map((l: any) => String(l.id || ""));
-
-            const prevVisibility: Record<string, string> = {};
-            for (const id of overlayLayerIds) {
-                try {
-                    const cur = map.getLayoutProperty(id, "visibility") as string | undefined;
-                    prevVisibility[id] = cur === undefined ? "visible" : cur;
-                    map.setLayoutProperty(id, "visibility", "none");
-                } catch { }
-            }
-
-            // Ensure a repaint so the hidden layers are not present in the canvas
-            try { map.triggerRepaint(); } catch { }
-            await new Promise<void>((resolve) => {
-                let done = false;
-                const onRender = () => {
-                    if (done) return;
-                    done = true;
-                    try { map.off('render', onRender); } catch { }
-                    resolve();
-                };
-                try { map.once('render', onRender); } catch { setTimeout(resolve, 150); }
-                setTimeout(() => { if (!done) { done = true; try { map.off('render', onRender); } catch { } resolve(); } }, 500);
-            });
-
             // @ts-ignore
             baseMapDataUrl = canvas.toDataURL("image/png");
-
-            // restore visibilities
-            for (const id of Object.keys(prevVisibility)) {
-                try { map.setLayoutProperty(id, "visibility", prevVisibility[id]); } catch { }
-            }
-
-            // give map a chance to repaint back
-            try { map.triggerRepaint(); } catch { }
-
         } catch (e) {
             console.error("Export failed", e);
             alert("שגיאת אבטחה (CORS): השרת של המפה חוסם ייצוא תמונה. נסה להחליף סגנון מפה.");
