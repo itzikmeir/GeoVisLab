@@ -18,47 +18,58 @@ const ExportFileManager: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [generateInaccurateMode, setGenerateInaccurateMode] = useState(false);
+  
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const mainContainerRef = useRef<HTMLDivElement>(null); // רף לגלילה ראשית
 
-  // גלילה אוטומטית ללוג האחרון
-  //useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
+  // גלילה אוטומטית ללוג
+  useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
+
+  // --- תיקון: גלילה לראש העמוד בעת הפתיחה ---
+  useEffect(() => {
+    if (mainContainerRef.current) {
+        mainContainerRef.current.scrollTop = 0;
+    }
+  }, []);
 
   const addLog = (msg: string) => setLogs(prev => [...prev, `${new Date().toLocaleTimeString('he-IL')}: ${msg}`]);
 
-  // פונקציית ניקוי מזהים
   const cleanIdString = (str: any): string => {
     if (!str) return '';
-    return String(str).trim().replace(/[\u200B-\u200D\uFEFF]/g, ''); 
+    return String(str).trim();
   };
 
-  // שליפת ערך מעמודה בצורה גמישה מאוד
-  const getValueFromRow = (row: any, keys: string[]) => {
-    // 1. חיפוש מדויק
-    for (const key of keys) {
-      if (row[key] !== undefined && row[key] !== null) return String(row[key]).trim();
-    }
-    // 2. חיפוש לא תלוי אותיות גדולות/קטנות או רווחים
+  const escapeJsonString = (str: string) => {
+    if (!str) return "";
+    return str
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t');
+  };
+
+  // --- פונקציה להמרת עברית לאנגלית (א׳ -> A) ---
+  const normalizeRoute = (val: any): string => {
+      if (!val) return "A";
+      const str = String(val).trim().replace(/['`]/g, ''); // מסיר גרשיים
+      
+      if (str === 'א' || str === 'א׳') return 'A';
+      if (str === 'ב' || str === 'ב׳') return 'B';
+      if (str === 'ג' || str === 'ג׳') return 'C';
+      
+      return str.toUpperCase();
+  };
+
+  // --- פונקציה חכמה למציאת מפתח העמודה (מתגברת על BOM ורווחים) ---
+  const findColumnKey = (row: any, possibleNames: string[]): string | undefined => {
     const rowKeys = Object.keys(row);
-    for (const key of keys) {
-      // חיפוש גמיש שמתעלם מ-Case ומרווחים מיותרים
-      const foundKey = rowKeys.find(k => k.trim().toLowerCase() === key.toLowerCase().trim());
-      if (foundKey && row[foundKey]) return String(row[foundKey]).trim();
-    }
-    return '';
+    return rowKeys.find(key => {
+        const cleanKey = key.replace(/^[\uFEFF\s]+/, '').trim().toLowerCase();
+        return possibleNames.some(name => cleanKey === name.toLowerCase());
+    });
   };
 
-  // המרה והתאמה של נתיבים
-  const mapRouteValue = (val: string): string => {
-    if (!val) return "";
-    const cleanVal = val.trim().replace(/['`"״]/g, ''); // הסרת גרשיים מכל סוג
-    if (cleanVal === 'א') return 'A';
-    if (cleanVal === 'ב') return 'B';
-    if (cleanVal === 'ג') return 'C';
-    // מחזיר את הערך המקורי אם הוא כבר באנגלית (A/B/C) או מספר
-    return cleanVal; 
-  };
-
-  // --- שלב 1: טעינת אקסל ---
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -69,89 +80,64 @@ const ExportFileManager: React.FC = () => {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
         
-        // סריקת כל הגליונות
-        let targetSheetName = '';
-        let rawData: any[] = [];
-        let foundColumns: string[] = [];
+        // חיפוש ספציפי של הגיליון "קטלוג תרחישים"
+        const targetSheetName = "קטלוג תרחישים";
+        let wsName = wb.SheetNames.find(n => n.trim() === targetSheetName);
 
-        for (const sheetName of wb.SheetNames) {
-          const ws = wb.Sheets[sheetName];
-          const data = XLSX.utils.sheet_to_json<any>(ws);
-          if (data.length > 0) {
-            const cols = Object.keys(data[0]);
-            const hasTarget = cols.some(c => 
-                c.toUpperCase().includes('REC_INACCURATE') || 
-                c.toUpperCase().includes('INACCURATE') || 
-                c.includes('מטלה') ||
-                c.toLowerCase().includes('task')
-            );
-            
-            if (hasTarget && !cols.includes('Participant_ID')) {
-              targetSheetName = sheetName;
-              rawData = data;
-              foundColumns = cols;
-              break; 
-            }
-          }
+        if (wsName) {
+            addLog(`📄 נמצא הגיליון המבוקש: "${wsName}"`);
+        } else {
+            addLog(`⚠️ לא נמצא גיליון בשם "${targetSheetName}". לוקח את הראשון: "${wb.SheetNames[0]}"`);
+            wsName = wb.SheetNames[0];
         }
 
-        if (!targetSheetName) {
-           targetSheetName = wb.SheetNames[0];
-           rawData = XLSX.utils.sheet_to_json<any>(wb.Sheets[targetSheetName]);
-           if (rawData.length > 0) foundColumns = Object.keys(rawData[0]);
-        }
+        const ws = wb.Sheets[wsName];
+        const data = XLSX.utils.sheet_to_json<any>(ws);
 
-        addLog(`📂 גליון נבחר: "${targetSheetName}"`);
-        addLog(`🔍 עמודות שנמצאו: ${foundColumns.join(', ')}`);
+        if (data.length === 0) {
+            addLog('⚠️ הגיליון ריק.');
+            return;
+        }
 
         const newMap: Record<string, ScenarioData> = {};
-        let mappedCount = 0;
+        let successCount = 0;
+        
+        const idKey = findColumnKey(data[0], ['SCN_ID', 'ID', 'ScenarioID']);
+        const taskKey = findColumnKey(data[0], ['TASK_TEXT', 'Task', 'task_text']);
+        const reqKey = findColumnKey(data[0], ['REQUIREMENTS', 'Requirements', 'req']);
+        const correctKey = findColumnKey(data[0], ['CORRECT_ROUTE', 'Correct', 'correct_route']);
+        const inaccKey = findColumnKey(data[0], ['REC_INACCURATE', 'Inaccurate', 'rec_inaccurate']);
 
-        rawData.forEach((row, index) => {
-          const rawId = getValueFromRow(row, ['Scenario_ID', 'Scenario ID', 'ID', 'm_ID']);
-          if (!rawId) return; 
+        if (!idKey) {
+            addLog(`❌ שגיאה: לא נמצאה עמודת SCN_ID בגיליון "${wsName}".`);
+            return;
+        }
 
-          const baseId = cleanIdString(rawId);
-          
-          // חילוץ המלצה שגויה עם לוגיקה מורחבת
-          const rawInaccurate = getValueFromRow(row, ['REC_INACCURATE', 'Rec_Inaccurate', 'Inaccurate', 'Rec Inaccurate', 'REC INACCURATE']);
-          const inaccurateVal = mapRouteValue(rawInaccurate);
+        data.forEach((row, idx) => {
+          const rawId = row[idKey];
+          const id = cleanIdString(rawId);
 
-          // לוג דיבאג ל-3 השורות הראשונות כדי לוודא קריאה
-          if (index < 3) {
-             console.log(`Row ${index}: ID=${baseId}, RawInaccurate="${rawInaccurate}", Mapped="${inaccurateVal}"`);
+          if (id) {
+            newMap[id] = {
+              id,
+              taskText: taskKey ? row[taskKey] : '',
+              requirements: reqKey ? row[reqKey] : '',
+              correctRoute: correctKey ? row[correctKey] : 'A',
+              inaccurateRoute: inaccKey ? row[inaccKey] : 'A' 
+            };
+            successCount++;
           }
-
-          const scenarioData: ScenarioData = {
-            id: baseId,
-            taskText: getValueFromRow(row, ['Task', 'TASK', 'מטלה', 'TaskText']),
-            requirements: getValueFromRow(row, ['Priority_Task', 'Priority Task', 'Participant_Task', 'Requirements']),
-            correctRoute: mapRouteValue(getValueFromRow(row, ['CORRECT_ROUTE', 'Correct_Route', 'Correct'])),
-            inaccurateRoute: inaccurateVal
-          };
-
-          newMap[baseId] = scenarioData;
-          newMap[`${baseId}_H`] = scenarioData;
-          newMap[`${baseId}_R`] = scenarioData;
-          newMap[`${baseId}_S`] = scenarioData;
-
-          mappedCount++;
         });
 
-        setExcelMap(newMap);
-        addLog(`✅ נטענו ${mappedCount} שורות.`);
-        
-        // בדיקת דגימה ללוג המשתמש
-        const firstKey = Object.keys(newMap)[0];
-        if (firstKey && newMap[firstKey].inaccurateRoute) {
-            addLog(`ℹ️ דוגמה: עבור ${firstKey}, המלצה שגויה שנקלטה: "${newMap[firstKey].inaccurateRoute}"`);
+        if (successCount === 0) {
+            addLog('❌ לא הצלחתי לטעון שורות תקינות.');
         } else {
-            addLog(`⚠️ שים לב: בשורה הראשונה לא נמצא ערך להמלצה שגויה. בדוק את שם העמודה באקסל.`);
+            setExcelMap(newMap);
+            addLog(`✅ נטענו ${successCount} שורות מהגיליון "${wsName}"`);
         }
-        
       } catch (err) {
+        addLog('❌ שגיאה בטעינת האקסל');
         console.error(err);
-        addLog(`❌ שגיאה בטעינת האקסל.`);
       }
     };
     reader.readAsBinaryString(file);
@@ -159,208 +145,157 @@ const ExportFileManager: React.FC = () => {
 
   const handleHtmlFolderUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.html'));
+      const files = Array.from(e.target.files).filter(f => f.name.endsWith('.html'));
       setHtmlFiles(files);
-      addLog(`📂 נטענו ${files.length} קבצי HTML.`);
+      addLog(`📂 נטענו ${files.length} קבצי HTML`);
     }
   };
 
-  // --- שלב 3: עיבוד הקבצים ---
   const processFiles = async () => {
-    if (!excelMap || htmlFiles.length === 0) {
-      alert("חסרים קבצים או נתוני אקסל.");
-      return;
-    }
-
+    if (!excelMap || htmlFiles.length === 0) return;
     setProcessing(true);
-    const zip = new JSZip();
-    let updatedCount = 0;
-    
-    const folderCorrect = generateInaccurateMode ? zip.folder("Correct") : zip; 
-    const folderInaccurate = generateInaccurateMode ? zip.folder("Inaccurate") : null;
+    addLog('--- מתחיל עיבוד ---');
 
-    addLog(`--- מתחיל עיבוד ---`);
+    const zip = new JSZip();
+    const folderCorrect = zip.folder("Correct_Scenarios");
+    const folderInaccurate = generateInaccurateMode ? zip.folder("Inaccurate_Scenarios") : null;
+
+    let processedCount = 0;
 
     for (const file of htmlFiles) {
-      try {
-        const text = await file.text();
-        const dataRegex = /(const|var|let)\s+DATA\s*=\s*({[\s\S]*?});/;
-        const match = text.match(dataRegex);
+      const rawName = file.name.replace('Exp_', '').replace('.html', '');
+      const baseId = rawName.replace(/_[HRS]$/i, ''); 
+      
+      const row = excelMap[cleanIdString(baseId)];
 
-        let contentForCorrect = text;
-        let contentForInaccurate = text;
+      if (row) {
+        let content = await file.text();
 
-        if (match) {
-          const jsonStr = match[2]; 
-          let dataObj; 
-          try {
-            dataObj = JSON.parse(jsonStr);
-          } catch (e) {
-             try {
-                // eslint-disable-next-line no-new-func
-                dataObj = new Function("return " + jsonStr)();
-             } catch (err2) {
-                if (folderCorrect) folderCorrect.file(file.name, text);
-                continue;
-             }
-          }
-
-          let rawScenarioName = dataObj.scenarioName ? String(dataObj.scenarioName) : '';
-          let scenarioName = cleanIdString(rawScenarioName);
-          
-          if (scenarioName) {
-            let row = excelMap[scenarioName];
-
-            // מנגנון זיהוי חכם
-            if (!row && scenarioName.includes('_')) {
-               const parts = scenarioName.split('_');
-               if (parts.length >= 2) { 
-                   const baseName = parts.slice(0, parts.length - 1).join('_');
-                   row = excelMap[baseName];
-               }
-            }
-
-            if (row) {
-              // --- 1. עדכון לתיקיית Correct ---
-              const dataCorrect = { ...dataObj };
-              if (row.taskText) dataCorrect.taskText = row.taskText;
-              if (row.requirements) dataCorrect.requirementsText = row.requirements;
-              if (row.correctRoute) dataCorrect.recVal = row.correctRoute; 
-
-              contentForCorrect = contentForCorrect.replace(jsonStr, JSON.stringify(dataCorrect, null, 2));
-
-              // --- 2. עדכון לתיקיית Inaccurate ---
-              if (generateInaccurateMode && folderInaccurate) {
-                const dataInaccurate = { ...dataObj };
-                if (row.taskText) dataInaccurate.taskText = row.taskText;
-                if (row.requirements) dataInaccurate.requirementsText = row.requirements;
-                
-                // הזרקת המלצה שגויה
-                if (row.inaccurateRoute) {
-                   dataInaccurate.recVal = row.inaccurateRoute;
-                } else {
-                   // אם אין המלצה שגויה, נשאיר את המקורית או נתריע? 
-                   // כרגע משאיר את מה שהיה בקובץ המקורי (בדרך כלל הנכון)
-                }
-                
-                contentForInaccurate = contentForInaccurate.replace(jsonStr, JSON.stringify(dataInaccurate, null, 2));
-              }
-              
-              updatedCount++;
-            } else {
-              addLog(`⛔ ${file.name} (${scenarioName}): לא נמצא באקסל.`);
-            }
-          }
+        if (row.taskText) {
+             content = content.replace(/"taskText"\s*:\s*".*?"/, `"taskText":"${escapeJsonString(row.taskText)}"`);
         }
-
-        // CSS
+        if (row.requirements) {
+             content = content.replace(/"requirementsText"\s*:\s*".*?"/, `"requirementsText":"${escapeJsonString(row.requirements)}"`);
+        }
+        
         if (globalCss.trim()) {
-          const styleInjection = `\n<style>\n${globalCss}\n</style>\n</head>`;
-          contentForCorrect = contentForCorrect.replace('</head>', styleInjection);
-          if (generateInaccurateMode) {
-            contentForInaccurate = contentForInaccurate.replace('</head>', styleInjection);
-          }
+          content = content.replace('</head>', `<style>${globalCss}</style></head>`);
         }
 
-        if (folderCorrect) folderCorrect.file(file.name, contentForCorrect);
-        if (generateInaccurateMode && folderInaccurate) folderInaccurate.file(file.name, contentForInaccurate);
+        let contentCorrect = content;
+        const routeCorrect = normalizeRoute(row.correctRoute);
+        contentCorrect = contentCorrect.replace(/"recommendedRoute"\s*:\s*".*?"/, `"recommendedRoute":"${routeCorrect}"`);
+        folderCorrect?.file(file.name, contentCorrect);
 
-      } catch (err) {
-        console.error(`Error processing ${file.name}`, err);
+        if (generateInaccurateMode && folderInaccurate) {
+            let contentInaccurate = content;
+            const routeInaccurate = normalizeRoute(row.inaccurateRoute || row.correctRoute);
+            contentInaccurate = contentInaccurate.replace(/"recommendedRoute"\s*:\s*".*?"/, `"recommendedRoute":"${routeInaccurate}"`);
+            folderInaccurate.file(file.name, contentInaccurate);
+        }
+
+        addLog(`✅ עובד: ${file.name} (ID: ${baseId} -> Rec: ${routeCorrect})`);
+        processedCount++;
+
+      } else {
+        addLog(`⚠️ לא נמצא באקסל: ${file.name} (זוהה ID: ${baseId}) - הועתק ללא שינוי`);
+        folderCorrect?.file(file.name, await file.text());
       }
     }
 
-    const blob = await zip.generateAsync({ type: "blob" });
-    saveAs(blob, generateInaccurateMode ? "Scenarios_Correct_Inaccurate.zip" : "Scenarios_Updated.zip");
-    
-    addLog(`✨ סיום: ${updatedCount} קבצים עודכנו.`);
+    if (processedCount > 0) {
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      saveAs(zipBlob, `Updated_Scenarios_${timestamp}.zip`);
+      addLog(`🎉 סיימנו! ${processedCount} קבצים עובדו.`);
+    } else {
+      addLog('❌ לא בוצעו שינויים.');
+    }
+
     setProcessing(false);
   };
 
-  // --- Styles (Fixed Layout) ---
+  // --- עדכון סטיילים לגלילה ---
   const styles = {
-    // מכולה ראשית מותאמת לגובה המסך כדי למנוע חיתוך
-    container: {
-      padding: '20px 30px',
-      direction: 'rtl' as const,
-      fontFamily: 'Segoe UI, Tahoma, sans-serif',
-      maxWidth: '900px',
-      margin: '0 auto',
-      marginTop: '20px',            // הוגדל מ-10 ל-100 כדי לא להיחתך בבר העליון
-      height: 'calc(100% - 40px)', // תופס את כל הגובה הפנוי פחות השוליים
-      overflowY: 'auto' as const,    // גלילה פנימית
-      backgroundColor: '#0f172a',
-      color: '#e2e8f0',
-      borderRadius: '8px',
-      boxSizing: 'border-box' as const,
-      border: '1px solid #334155'
+    // הקונטיינר הראשי תופס את כל הגובה ומאפשר גלילה
+    container: { 
+        height: '100%', 
+        overflowY: 'auto' as const, // מאפשר גלילה אנכית
+        padding: '20px', 
+        fontFamily: 'Segoe UI, sans-serif', 
+        direction: 'rtl' as const, 
+        color: '#e2e8f0',
+        boxSizing: 'border-box' as const
     },
-    header: { marginBottom: '20px', borderBottom: '2px solid #3b82f6', paddingBottom: '10px' },
-    card: { background: '#1e293b', padding: '20px', borderRadius: '12px', border: '1px solid #334155', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.5)', marginBottom: '20px' },
-    cardHeader: { display: 'flex', alignItems: 'center', marginBottom: '15px' },
-    stepIcon: { background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', marginLeft: '12px', flexShrink: 0 },
-    input: { width: '100%', padding: '12px', background: '#0f172a', border: '1px solid #475569', color: '#f1f5f9', borderRadius: '6px', marginTop: '10px', boxSizing: 'border-box' as const, outline: 'none' },
-    checkboxContainer: { marginTop: '15px', padding: '12px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #1e40af', borderRadius: '6px', display: 'flex', alignItems: 'flex-start', gap: '10px' },
-    button: { width: '100%', padding: '15px', background: processing ? '#475569' : 'linear-gradient(to left, #2563EB, #3b82f6)', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: processing ? 'not-allowed' : 'pointer', fontSize: '18px', marginTop: '10px', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' },
-    logBox: { background: '#020617', color: '#4ade80', padding: '15px', borderRadius: '12px', fontSize: '13px', fontFamily: 'Consolas, monospace', height: '200px', overflowY: 'auto' as const, direction: 'ltr' as const, border: '1px solid #334155' }
+    // התוכן עצמו ממורכז
+    contentWrapper: {
+        maxWidth: '800px', 
+        margin: '0 auto',
+        paddingBottom: '50px' // רווח מלמטה כדי שהלוג לא יהיה דבוק
+    },
+    header: { textAlign: 'center' as const, marginBottom: '30px', color: '#60a5fa' },
+    card: { background: '#1e293b', borderRadius: '12px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
+    cardHeader: { display: 'flex', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #334155', paddingBottom: '10px' },
+    stepIcon: { width: '30px', height: '30px', borderRadius: '50%', background: '#3b82f6', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', marginLeft: '10px' },
+    input: { width: '100%', padding: '10px', marginTop: '10px', borderRadius: '6px', border: '1px solid #475569', background: '#0f172a', color: 'white' },
+    button: { width: '100%', padding: '15px', background: 'linear-gradient(to right, #2563eb, #3b82f6)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', marginTop: '20px', transition: 'transform 0.1s' },
+    logBox: { background: '#000', padding: '15px', borderRadius: '8px', height: '200px', overflowY: 'auto' as const, fontFamily: 'monospace', fontSize: '13px', border: '1px solid #333' },
+    checkboxContainer: { marginTop: '15px', padding: '10px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', display: 'flex', alignItems: 'center' }
   };
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={{ margin: 0, fontSize: '22px', color: '#f8fafc' }}>מנהל הזרקת נתונים</h1>
-        <p style={{ margin: '5px 0 0 0', color: '#94a3b8', fontSize: '14px' }}>
-          תיקון: Priority_Task, REC_INACCURATE וגלילה פנימית.
-        </p>
-      </header>
-      
-      <div>
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <div style={styles.stepIcon}>1</div>
-            <h3 style={{ margin: 0, fontSize: '18px' }}>טעינת קטלוג (Excel)</h3>
-          </div>
-          <div style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '15px', lineHeight: '1.6' }}>
-            וודא שהעמודות קיימות: <b>Scenario_ID, Task, Priority_Task, Correct_Route, REC_INACCURATE</b>
-          </div>
-          <input type="file" accept=".xlsx, .xls, .csv" onChange={handleExcelUpload} style={styles.input} />
-          
-          <div style={styles.checkboxContainer}>
-            <input type="checkbox" id="inaccurateMode" checked={generateInaccurateMode} onChange={(e) => setGenerateInaccurateMode(e.target.checked)} style={{ width: '20px', height: '20px', cursor: 'pointer', marginTop: '2px' }} />
-            <label htmlFor="inaccurateMode" style={{ cursor: 'pointer', fontSize: '14px' }}><b>יצירת סט כפול (Correct / Inaccurate)</b></label>
-          </div>
+    <div style={styles.container} ref={mainContainerRef}>
+      <div style={styles.contentWrapper}>
+          <h1 style={styles.header}>ניהול ועדכון קבצי HTML מיוצאים</h1>
 
-          {excelMap && <div style={{ marginTop: '10px', color: '#4ade80', fontSize: '14px', fontWeight: 'bold' }}>✓ נטענו {Object.keys(excelMap).length} מזהים לזיכרון.</div>}
-        </section>
-
-        <section style={styles.card}>
-           <div style={styles.cardHeader}>
-            <div style={styles.stepIcon}>2</div>
-            <h3 style={{ margin: 0, fontSize: '18px' }}>תיקיית קבצים (HTML)</h3>
-          </div>
-          //@ts-expect-error
-          <input type="file" {...({ webkitdirectory: "true" } as any)} multiple onChange={handleHtmlFolderUpload} style={styles.input} />
-          {htmlFiles.length > 0 && <div style={{ marginTop: '10px', color: '#4ade80' }}>✓ זוהו {htmlFiles.length} קבצים</div>}
-        </section>
-
-        <section style={styles.card}>
-           <div style={styles.cardHeader}>
-            <div style={styles.stepIcon}>3</div>
-            <h3 style={{ margin: 0, fontSize: '18px' }}>עיצוב גלובלי (CSS)</h3>
-          </div>
-          <textarea rows={3} placeholder="לדוגמה: body { background: #1a1a1a; }" value={globalCss} onChange={(e) => setGlobalCss(e.target.value)} style={{ ...styles.input, fontFamily: 'monospace', direction: 'ltr', resize: 'vertical' }} />
-        </section>
-
-        <button onClick={processFiles} disabled={processing || !excelMap || htmlFiles.length === 0} style={styles.button}>{processing ? 'מעבד נתונים...' : '🚀 הרץ עדכון'}</button>
-
-        <div style={{ marginTop: '20px' }}>
-            <label style={{color: '#94a3b8', fontSize: '14px', marginBottom: '5px', display: 'block'}}>לוג מערכת:</label>
-            <div style={styles.logBox}>
-            {logs.length === 0 ? <span style={{opacity: 0.5}}>{'> ממתין להרצה...'}</span> : logs.map((log, i) => <div key={i} style={{ marginBottom: '4px', borderBottom: '1px solid #1e293b' }}>{'> ' + log}</div>)}
-            <div ref={logsEndRef} />
+          <section style={styles.card}>
+            <div style={styles.cardHeader}>
+              <div style={styles.stepIcon}>1</div>
+              <h3 style={{ margin: 0, fontSize: '18px' }}>טעינת קובץ אקסל (נתונים)</h3>
             </div>
-        </div>
+            <p style={{ fontSize: '14px', color: '#94a3b8' }}>המערכת תחפש אוטומטית את הגיליון: <b>"קטלוג תרחישים"</b></p>
+            <input type="file" accept=".xlsx, .xls" onChange={handleExcelUpload} style={styles.input} />
+          </section>
 
+          <section style={styles.card}>
+            <div style={styles.cardHeader}>
+              <div style={styles.stepIcon}>2</div>
+              <h3 style={{ margin: 0, fontSize: '18px' }}>טעינת תיקיית קבצי HTML</h3>
+            </div>
+            <p style={{ fontSize: '14px', color: '#94a3b8' }}>בחר את התיקייה עם קבצי ה-Exp_SCN...html</p>
+            <input type="file" {...({ webkitdirectory: "true" } as any)} multiple onChange={handleHtmlFolderUpload} style={styles.input} />
+            {htmlFiles.length > 0 && <div style={{ marginTop: '10px', color: '#4ade80' }}>✓ זוהו {htmlFiles.length} קבצים</div>}
+          </section>
+
+          <section style={styles.card}>
+            <div style={styles.cardHeader}>
+              <div style={styles.stepIcon}>3</div>
+              <h3 style={{ margin: 0, fontSize: '18px' }}>הגדרות מתקדמות</h3>
+            </div>
+            <textarea rows={3} placeholder="עיצוב CSS גלובלי (אופציונלי)..." value={globalCss} onChange={(e) => setGlobalCss(e.target.value)} style={{ ...styles.input, fontFamily: 'monospace', direction: 'ltr', resize: 'vertical' }} />
+            
+            <div style={styles.checkboxContainer}>
+                <input 
+                    type="checkbox" 
+                    id="inaccurateMode" 
+                    checked={generateInaccurateMode} 
+                    onChange={(e) => setGenerateInaccurateMode(e.target.checked)}
+                    style={{ width: '20px', height: '20px', marginLeft: '10px' }}
+                />
+                <label htmlFor="inaccurateMode" style={{ cursor: 'pointer', color: '#fca5a5', fontWeight: 'bold' }}>
+                  יצירת גרסה עם המלצות שגויות (REC_INACCURATE)
+                </label>
+            </div>
+          </section>
+
+          <button onClick={processFiles} disabled={processing || !excelMap || htmlFiles.length === 0} style={styles.button}>{processing ? 'מעבד נתונים...' : '🚀 הרץ עדכון'}</button>
+
+          <div style={{ marginTop: '20px' }}>
+              <label style={{color: '#94a3b8', fontSize: '14px', marginBottom: '5px', display: 'block'}}>לוג מערכת:</label>
+              <div style={styles.logBox} ref={logsEndRef}>
+              {logs.length === 0 ? <span style={{opacity: 0.5}}>המתנה לפעולה...</span> : logs.map((l, i) => <div key={i}>{l}</div>)}
+              </div>
+          </div>
       </div>
     </div>
   );
