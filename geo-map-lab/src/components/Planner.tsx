@@ -3220,7 +3220,7 @@ function computeRouteScores(
         const timeS = trafficM / vTraffic + freeM / vFree;
 
         // scores
-        const speedScore = 100 - 70 * fracTraffic;        // 100..30
+        const speedScore = 100 * (1 - fracTraffic);        // 100..30
         const economyScore = 100 * (1 - fracToll);        // 100..0
         const scenicScore = 100 * fracScenic;             // 0..100
         const commScore = 30 + 70 * fracComm;             // 30..100
