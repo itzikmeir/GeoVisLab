@@ -78,7 +78,59 @@ function buildParticipantHtml(args: {
       box-shadow: 0 4px 12px rgba(0,0,0,0.4); 
       border-radius: 8px; 
   }
+    /* הוסף את זה בתוך ה-style tag של ה-HTML המיוצא */
+    .small-note { 
+        font-size: 16px; 
+        opacity: 0.7; 
+        margin-top: 4px; 
+        line-height: 1.4;
+    }
 
+        /* עיצוב מיכל הטיימר */
+    .timer-container {
+        margin-top: auto;
+        padding-top: 10px;
+        direction: rtl;
+    }
+
+    .timer-labels {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+
+    #timerDisplay {
+        font-size: 18px;
+        transition: color 0.3s;
+    }
+
+  .progress-bg {
+    width: 100%;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255,255,255,0.1);
+    /* יישור לימין בקונבנציה עברית */
+    display: flex;
+    flex-direction: row; 
+    justify-content: flex-start; 
+}
+
+#progressBar {
+    height: 100%;
+    width: 100%;
+    background: #22C55E;
+    /* מעבר חלק בשינוי רוחב */
+    transition: width 0.1s linear, background-color 0.5s;
+}
+
+    .timer-overtime {
+        color: #EF4444 !important; /* אדום לחריגה */
+    }
   .top { flex: 1; min-height: 0; display: flex; gap: 8px; direction: ltr; }
 
   /* Map Panel */
@@ -369,18 +421,29 @@ function buildParticipantHtml(args: {
       <div class="h">מטלה</div>
       <div class="muted" id="taskText"></div>
       <div class="muted" id="requirementsText" style="font-weight:900; margin-top:8px; display:none; font-size:24px; font-family: Arial !important, sans-serif !important"></div>
+      <div class="muted" id="requirementsText" style="font-weight:900; margin-top:8px; display:none; font-size:24px; font-family: Arial !important"></div>
+      <div class="small-note">אם יש יותר ממסלול אחד שעומד בדרישות, יש להעדיף את המסלול עם זמן הנסיעה הכולל הקצר מבינהם.</div>
       <div class="sep"></div>
       <div class="recBox">
         <div class="recLabel">המלצת המערכת</div>
         <div class="recVal" id="recRoute" style= "font-size:20px; font-family: Arial !important"></div>
       </div>
       <div style="font-size:12px; margin-top:4px; opacity:0.8; margin-right:20px">ניתן לבחור מסלול בלחיצה על הקו במפה (או על תגית א/ב/ג).</div>
-      
+
       <div class="sep"></div>
       <div style="display:flex; justify-content:space-between; align-items:center; font-weight:700">
         <span style="font-size:20px; margin-right:20px">מסלול נבחר:</span>
         <span id="pickedDisplay" style="font-size:20px; color:#60A5FA; margin-left:18px">—</span>
       </div>
+      <div class="timer-container">
+    <div class="timer-labels">
+        <span style="font-size: 14px; opacity: 0.9;">זמן שנותר למטלה:</span>
+        <span id="timerDisplay">00:30</span>
+    </div>
+    <div class="progress-bg">
+        <div id="progressBar"></div>
+    </div>
+</div>
       <button class="btnPrimary" id="submitBtn">אישור בחירה</button>
     </div>
   </div>
@@ -1059,6 +1122,46 @@ els.filterBtn.onclick = () => {
     });
     document.getElementById('filterModal').classList.add('show');
 };
+(function() {
+    let timeLeft = 30; 
+    let isOvertime = false;
+    const timerDisplay = document.getElementById('timerDisplay');
+    const progressBar = document.getElementById('progressBar');
+    const progressBg = progressBar.parentElement;
+    
+    const interval = setInterval(() => {
+        if (!isOvertime) {
+            timeLeft -= 0.1;
+            if (timeLeft <= 0) {
+                isOvertime = true;
+                timeLeft = 0;
+                timerDisplay.classList.add('timer-overtime');
+                progressBar.style.backgroundColor = '#EF4444';
+                
+                // בחריגה: מחליפים את העיגון לשמאל כדי שהאדום יצמח ימינה
+                progressBg.style.justifyContent = 'flex-end'; 
+            }
+        } else {
+            timeLeft += 0.1;
+        }
+
+        const displaySecs = Math.abs(Math.ceil(timeLeft));
+        const mins = Math.floor(displaySecs / 60);
+        const secs = displaySecs % 60;
+        timerDisplay.textContent = (isOvertime ? "+" : "") + 
+            (mins < 10 ? "0" : "") + mins + ":" + (secs < 10 ? "0" : "") + secs;
+
+        if (!isOvertime) {
+            // הבר מתקצר מימין לשמאל (נסוג אל נקודת ה-0 בשמאל)
+            const progress = (timeLeft / 30) * 100;
+            progressBar.style.width = progress + "%";
+        } else {
+            // הבר האדום צומח משמאל לימין (מתרחק מנקודת ה-0)
+            const progress = Math.min((timeLeft / 30) * 100, 100);
+            progressBar.style.width = progress + "%";
+        }
+    }, 100);
+})();
 document.getElementById('closeFilter').onclick = () => document.getElementById('filterModal').classList.remove('show');
 document.getElementById('showAll').onclick = () => { for(let k in filters)filters[k]=true; drawMap(); els.filterBtn.click(); };
 document.getElementById('hideAll').onclick = () => { for(let k in filters)filters[k]=false; drawMap(); els.filterBtn.click(); };
@@ -5211,7 +5314,20 @@ export default function App() {
         if (taskMode === "Elimination") {
             // --- לוגיקה חדשה: Elimination ---
             const thresholdScore = taskGateMinFrac * 100;
-            const passingRoutes = routeData.filter(r => r.primaryScore >= thresholdScore);
+            const passingRoutes = routeData.filter(r => {
+        // 1. בדיקת הקטגוריה הראשית
+                const passesPrimary = r.primaryScore >= thresholdScore;
+                
+                // 2. בדיקת קטגוריה מקומית (אם מופעלת)
+                let passesLocal = true;
+                if (taskLocalEnabled) {
+                    const localSegIdx = taskLocalSegment - 1; // המרה לאינדקס 0-2
+                    const localScore = segScore0100(r.rawStats.segments[localSegIdx], taskLocalCat);
+                    passesLocal = localScore >= thresholdScore;
+                }
+                
+                return passesPrimary && passesLocal;
+            });
 
             if (passingRoutes.length > 0) {
                 // עוברים סף -> המהיר מנצח
