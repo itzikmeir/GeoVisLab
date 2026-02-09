@@ -106,26 +106,29 @@ function buildParticipantHtml(args: {
         transition: color 0.3s;
     }
 
-  .progress-bg {
+.progress-bg {
     width: 100%;
     height: 12px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.5); /* הרקע הכהה שייחשף מימין */
     border-radius: 6px;
     overflow: hidden;
     position: relative;
     border: 1px solid rgba(255,255,255,0.1);
-    /* יישור לימין בקונבנציה עברית */
-    display: flex;
-    flex-direction: row; 
-    justify-content: flex-start; 
 }
 
 #progressBar {
     height: 100%;
-    width: 100%;
+    width: 100%; /* מתחיל מלא בירוק */
     background: #22C55E;
-    /* מעבר חלק בשינוי רוחב */
+    position: absolute;
+    left: 0; /* מעוגן לשמאל */
+    top: 0;
     transition: width 0.1s linear, background-color 0.5s;
+}
+
+/* אחידות גודל טקסט לויזואליזציות כפי שביקשת */
+.stack-label, .heatmap-cell, .radar-chart text {
+    font-size: 12px !important;
 }
 
     .timer-overtime {
@@ -267,14 +270,14 @@ function buildParticipantHtml(args: {
   
   .heatmap-cell { 
       text-align: center; vertical-align: middle; 
-      color: #fff; font-weight: 900; font-size: 15px;
+      color: #fff; font-weight: 900; font-size: 12px;
       text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 5px rgba(0,0,0,0.8);
       margin: 2px; border-radius: 4px; height: 100%;
   }
   .heatmap-table td > div { height: 85%; width: 92%; margin: 0 auto; display:flex; align-items:center; justify-content:center; border-radius:4px; }
   .segment-badge {
       display: inline-block; width: 20px; height: 20px; line-height: 20px;
-      border-radius: 50%; background-color: #1E4ED8; color: white; text-align: center; font-weight: bold; font-size: 11px;
+      border-radius: 50%; background-color: #1E4ED8; color: white; text-align: center; font-weight: bold; font-size: 12px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
   }
 
@@ -283,7 +286,7 @@ function buildParticipantHtml(args: {
   .stacked-col-container { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 0 10px; }
   .stacked-bar { width: 60%; display: flex; flex-direction: column-reverse; border-radius: 4px 4px 0 0; overflow: hidden; background: rgba(255,255,255,0.05); }
   .stack-segment { width: 100%; position: relative; border-top: 1px solid rgba(255,255,255,0.2); overflow: visible !important; box-sizing: border-box; }
-  .stack-label { position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); text-align: center; color: white; font-weight: bold; font-size: 11px; text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 2px black; white-space: nowrap; pointer-events: none; display: flex; align-items: center; justify-content: center; gap: 4px; }
+  .stack-label { position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); text-align: center; color: white; font-weight: bold; font-size: 12px; text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 2px black; white-space: nowrap; pointer-events: none; display: flex; align-items: center; justify-content: center; gap: 4px; }
 
   /* Radar */
   .radar-wrapper { display: flex; width: 100%; height: 100%; align-items: center; justify-content: space-around; direction: rtl; }
@@ -1127,7 +1130,6 @@ els.filterBtn.onclick = () => {
     let isOvertime = false;
     const timerDisplay = document.getElementById('timerDisplay');
     const progressBar = document.getElementById('progressBar');
-    const progressBg = progressBar.parentElement;
     
     const interval = setInterval(() => {
         if (!isOvertime) {
@@ -1136,13 +1138,10 @@ els.filterBtn.onclick = () => {
                 isOvertime = true;
                 timeLeft = 0;
                 timerDisplay.classList.add('timer-overtime');
-                progressBar.style.backgroundColor = '#EF4444';
-                
-                // בחריגה: מחליפים את העיגון לשמאל כדי שהאדום יצמח ימינה
-                progressBg.style.justifyContent = 'flex-end'; 
+                progressBar.style.backgroundColor = '#EF4444'; // הופך לאדום בחריגה
             }
         } else {
-            timeLeft += 0.1;
+            timeLeft += 0.1; 
         }
 
         const displaySecs = Math.abs(Math.ceil(timeLeft));
@@ -1151,15 +1150,17 @@ els.filterBtn.onclick = () => {
         timerDisplay.textContent = (isOvertime ? "+" : "") + 
             (mins < 10 ? "0" : "") + mins + ":" + (secs < 10 ? "0" : "") + secs;
 
+        let progress;
         if (!isOvertime) {
-            // הבר מתקצר מימין לשמאל (נסוג אל נקודת ה-0 בשמאל)
-            const progress = (timeLeft / 30) * 100;
-            progressBar.style.width = progress + "%";
+            // הירוק קטן: מ-100% לכיוון 0%. מכיוון שהוא ב-left:0, הקצה הימני שלו יזוז שמאלה.
+            progress = (timeLeft / 30) * 100;
         } else {
-            // הבר האדום צומח משמאל לימין (מתרחק מנקודת ה-0)
-            const progress = Math.min((timeLeft / 30) * 100, 100);
-            progressBar.style.width = progress + "%";
+            // באדום: הוא גדל שוב משמאל לימין ככל שהחריגה גדלה
+            progress = Math.min((timeLeft / 30) * 100, 100);
         }
+        
+        progressBar.style.width = progress + "%";
+        
     }, 100);
 })();
 document.getElementById('closeFilter').onclick = () => document.getElementById('filterModal').classList.remove('show');
