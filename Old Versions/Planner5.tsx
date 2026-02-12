@@ -340,10 +340,7 @@ function buildParticipantHtml(args: {
   .gBar { height: 100%; position: absolute; right: 0; top: 0; bottom: 0; border-radius: 4px; overflow: hidden; direction: rtl; display: flex; }
   .gSeg { height: 100%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 900; color: #000; background: #8CCBFF; border-left: 3px solid #000; box-sizing: border-box; }
   .gSeg:last-child { border-left: none; }
-    .gAxis { position: relative; height: 20px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.1); margin-right: 60px; direction: ltr; }
-    .gAxis .gAxisUnitLabel { position: absolute; right: -8px; top: 0; bottom: auto; font-size: 11px; line-height: 20px; opacity: 0.9; color: #cbd5e1; pointer-events: none; user-select: none; }
-    /* global style for fixed-positioned unit label (exported render will place it fixed at viewport right) */
-    .gAxisUnitLabel { font-size: 11px; color: #cbd5e1; opacity: 0.9; pointer-events: none; user-select: none; background: transparent; }
+  .gAxis { position: relative; height: 20px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.1); margin-right: 60px; direction: ltr; }
 
   /* Modals */
   .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(2px); }
@@ -1047,26 +1044,6 @@ function renderGantt() {
         ax.append(ln, tk);
     }
 
-    // add unit label to axis (minutes) without affecting layout - place it fixed at viewport right
-    const unit = document.createElement('div');
-    unit.className = 'gAxisUnitLabel';
-    unit.textContent = 'דקות';
-    // place at viewport far-right; we'll compute vertical position to align with axis
-    unit.style.position = 'fixed';
-    unit.style.right = '30px';
-    unit.style.zIndex = '9999';
-    document.body.appendChild(unit);
-    // compute vertical center of axis and align label center to it
-    try {
-        const rect = ax.getBoundingClientRect();
-        const h = unit.offsetHeight || 14;
-        const topPos = rect.top + rect.height/2 - h/2;
-        unit.style.top = Math.max(4, topPos) + 'px';
-    } catch(e) {
-        // fallback: place near bottom of the gantt area
-        unit.style.bottom = '18px';
-    }
-
     ['A','B','C'].forEach(rid => {
         const segs = scores.filter(s => s.route === rid).sort((a,b) => a.segment - b.segment);
         const total = segs.reduce((a,b) => a + (b.timeS || 0), 0) || 1;
@@ -1105,7 +1082,7 @@ function selectRoute(id) {
         
         indicator.style.display = 'block';
         // חישוב המיקום היחסי של אמצע השורה לעומת הפאנל
-        const topPos = (rowRect.top - panelRect.top) + (rowRect.height / 2) - 14;
+        const topPos = (rowRect.top - panelRect.top) + (rowRect.height / 2) - 10;
         indicator.style.top = topPos + 'px';
     }
 }
