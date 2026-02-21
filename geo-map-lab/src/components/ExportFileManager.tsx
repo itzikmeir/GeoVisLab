@@ -18,6 +18,7 @@ const ExportFileManager: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [generateInaccurateMode, setGenerateInaccurateMode] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState<number>(30); // ברירת מחדל 30 שניות
   
   const logsEndRef = useRef<HTMLDivElement>(null);
   const mainContainerRef = useRef<HTMLDivElement>(null); // רף לגלילה ראשית
@@ -151,7 +152,7 @@ const ExportFileManager: React.FC = () => {
     }
   };
 
-  const processFiles = async () => {
+const processFiles = async () => {
     if (!excelMap || htmlFiles.length === 0) return;
     setProcessing(true);
     addLog('--- מתחיל עיבוד ---');
@@ -171,6 +172,7 @@ const ExportFileManager: React.FC = () => {
       if (row) {
         let content = await file.text();
 
+        // 1. עדכון טקסטים
         if (row.taskText) {
              content = content.replace(/"taskText"\s*:\s*".*?"/, `"taskText":"${escapeJsonString(row.taskText)}"`);
         }
@@ -178,9 +180,17 @@ const ExportFileManager: React.FC = () => {
              content = content.replace(/"requirementsText"\s*:\s*".*?"/, `"requirementsText":"${escapeJsonString(row.requirements)}"`);
         }
         
+        // 2. הזרקת CSS
         if (globalCss.trim()) {
           content = content.replace('</head>', `<style>${globalCss}</style></head>`);
         }
+
+        // --- שלב 3: עדכון זמן הטיימר (כאן המקום הנכון) ---
+        // עדכון המשתנה timeLeft
+        content = content.replace(/let\s+timeLeft\s*=\s*30;/, `let timeLeft = ${timerSeconds};`); // <--- כאן
+        // עדכון חישוב האחוזים בבר ההתקדמות
+        content = content.replace(/\(timeLeft\s*\/\s*30\)/g, `(timeLeft / ${timerSeconds})`); // <--- כאן
+        // --------------------------------------------------
 
         let contentCorrect = content;
         const routeCorrect = normalizeRoute(row.correctRoute);
@@ -202,6 +212,8 @@ const ExportFileManager: React.FC = () => {
         folderCorrect?.file(file.name, await file.text());
       }
     }
+
+    // ... המשך הפונקציה (שמירת ה-ZIP)
 
     if (processedCount > 0) {
       const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -286,8 +298,19 @@ const ExportFileManager: React.FC = () => {
                   יצירת גרסה עם המלצות שגויות (REC_INACCURATE)
                 </label>
             </div>
+              <div style={{ marginBottom: '15px', padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+              <label style={{ color: '#94a3b8', display: 'block', marginBottom: '8px', fontSize: '14px' }}>
+                ⏳ זמן מוקצב לתרחיש (בשניות):
+              </label>
+              <input 
+                  type="number" 
+                  value={timerSeconds} 
+                  onChange={(e) => setTimerSeconds(Math.max(1, Number(e.target.value)))} 
+                  style={{ ...styles.input, width: '100px', textAlign: 'center' }} 
+                  />
+            </div>
           </section>
-
+          
           <button onClick={processFiles} disabled={processing || !excelMap || htmlFiles.length === 0} style={styles.button}>{processing ? 'מעבד נתונים...' : '🚀 הרץ עדכון'}</button>
 
           <div style={{ marginTop: '20px' }}>
