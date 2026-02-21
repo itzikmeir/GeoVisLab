@@ -25,7 +25,7 @@ function buildParticipantHtml(args: {
     taskText: string;
     requirementsText: string;
     recommendedRoute: "A" | "B" | "C";
-    vizType: "STACKED";
+    vizType: "STACKED" | "RADAR" | "HEATMAP" | string; // כאן הוספתי תמיכה לכל הסוגים
     baseMapDataUrl: string;
     mapView: { width: number; height: number; zoom: number; center: LngLat };
     start: LngLat | null;
@@ -212,15 +212,18 @@ function buildParticipantHtml(args: {
       flex-direction: column;
       position: relative; /* הוסף את השורה הזו */ 
   }
-    #selected-route-indicator {
+  #selected-route-indicator {
       position: absolute;
-      right: 0px; 
+      /* הפאנל של הויזואליזציה דוחף פנימה 12px (Padding). 
+         המשולש שלנו ברוחב 14px. כדי שהבסיס שלו יישב בול על המסגרת ב-12px, 
+         נמקם אותו במינוס 2 (14-12) כך שהשפיץ שלו יבלוט החוצה ימינה. */
+      right: -2px; 
       top: 50%;
       width: 0;
       height: 0;
       border-top: 12px solid transparent;
       border-bottom: 12px solid transparent;
-      border-left: 14px solid #3B82F6; 
+      border-left: 14px solid #3B82F6; /* המשולש מצביע ימינה */
       transition: top 0.3s ease-in-out;
       z-index: 100;
       display: none;
@@ -444,20 +447,20 @@ function buildParticipantHtml(args: {
     <div class="muted" id="requirementsText" style="font-weight:900; margin-top:8px; display:none; font-size:24px; font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif !important"></div>
       <div class="small-note">אם יש יותר ממסלול אחד שעומד בדרישות, יש להעדיף את המסלול עם זמן הנסיעה הכולל הקצר מבינהם.</div>
       <div class="sep"></div>
-      <div class="recBox">
+    <div class="recBox">
         <div class="recLabel">המלצת המערכת</div>
         <div class="recVal" id="recRoute" style= "font-size:20px; color:#cbd5e1; font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif !important"></div>
       </div>
-      <div style="font-size:12px; margin-top:4px; opacity:0.8; margin-right:20px">ניתן לבחור מסלול בלחיצה על הקו במפה (או על תגית א/ב/ג).</div>
-
-      <div class="sep"></div>
-      <div style="display:flex; justify-content:space-between; align-items:center; font-weight:700">
-        <span style="font-size:20px; margin-right:20px">מסלול נבחר:</span>
-        <span id="pickedDisplay" style="font-size:20px; color:#60A5FA; margin-left:18px">—</span>
+      
+      <div class="sep" style="margin-top: 15px;"></div>
+      
+      <div style="font-size:14px; margin-top:5px; margin-bottom:-2px; opacity:0.9; font-weight: 600;">
+          💡 ניתן לבחור מסלול בלחיצה על הקו במפה או בגרף זמני המקטעים למטלה.
       </div>
+
       <div class="timer-container">
     <div class="timer-labels">
-        <span style="font-size: 14px; opacity: 0.9;">זמן שנותר למטלה:</span>
+        <span style="font-size: 14px; opacity: 0.9;">זמן מוערך למטלה:</span>
         <span id="timerDisplay">00:30</span>
     </div>
     <div class="progress-bg">
@@ -527,7 +530,6 @@ const els = {
     taskText: document.getElementById('taskText'),
     requirementsText: document.getElementById('requirementsText'),
     recRoute: document.getElementById('recRoute'),
-    pickedDisplay: document.getElementById('pickedDisplay'),
     vizContainer: document.getElementById('viz-container'),
     vizLegend: document.getElementById('vizLegendContent'),
     gantt: document.getElementById('ganttContainer'),
@@ -1088,13 +1090,24 @@ function renderGantt() {
 
 function selectRoute(id) {
     picked = id;
-    els.pickedDisplay.textContent = 'מסלול ' + heb(id);
+    const routeName = 'מסלול ' + heb(id);
+    
+    // השורה הבאה נמחקה כי היא גרמה לשגיאה שמנעה את רינדור הגאנט והויזואליזציה
+    // els.pickedDisplay.textContent = routeName;
+    
+    // עדכון הכפתור שיהיה ברור מה מאשרים
+    const submitBtn = document.getElementById('submitBtn');
+    if (submitBtn) {
+        submitBtn.textContent = 'אישור בחירה - ' + routeName;
+    }
+
     renderVizContainer();
     renderGantt(); 
     drawMap();
-    updateIndicatorPosition(); // הוסף את הקריאה הזו כאן
+    updateIndicatorPosition(); 
 }
-    function updateIndicatorPosition() {
+
+function updateIndicatorPosition() {
     const indicator = document.getElementById('selected-route-indicator');
     const activeRow = document.querySelector('.ganttRow.active');
     const panel = document.querySelector('.vizPanel');
@@ -1104,8 +1117,8 @@ function selectRoute(id) {
         const panelRect = panel.getBoundingClientRect();
         
         indicator.style.display = 'block';
-        // חישוב המיקום היחסי של אמצע השורה לעומת הפאנל
-        const topPos = (rowRect.top - panelRect.top) + (rowRect.height / 2) - 14;
+        // חישוב המיקום היחסי: מיקום השורה פחות מיקום הפאנל פלוס חצי גובה השורה פחות חצי מגובה המשולש (12)
+        const topPos = (rowRect.top - panelRect.top) + (rowRect.height / 2) - 12;
         indicator.style.top = topPos + 'px';
     }
 }
@@ -3586,15 +3599,6 @@ function SegmentCircle({ n }: { n: number }) {
     );
 }
 
-function SegmentLabel({ n }: { n: number }) {
-    return (
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 7, justifyContent: "center" }}>
-            <span style={{ fontWeight: 900, opacity: 0.9 }}>מקטע</span>
-            <SegmentCircle n={n} />
-        </div>
-    );
-}
-
 function RoutePickerRight(props: {
     routeScores: RouteScore[];
     selectedRoute: BadgeId;
@@ -3638,9 +3642,28 @@ function RoutePickerRight(props: {
                                 borderRadius: 14,
                                 border: isSel ? `3px solid ${SELECTED_ROUTE_COLOR}` : "1px solid rgba(255,255,255,0.12)",
                                 background: isSel ? "rgba(30,78,216,0.12)" : "rgba(0,0,0,0.0)",
+                                position: "relative" // <--- 1. חובה להוסיף position relative
                             }}
                             title="לחץ כדי לבחור מסלול"
                         >
+                            {/* --- 2. תוספת של המשולש המקשר (יופיע רק על המסלול הנבחר) --- */}
+                            {isSel && (
+                                <div
+                                    style={{
+                                        position: "absolute",
+                                        right: -15, // ממקם אותו מחוץ למסגרת כך שיצביע לכיוון הוויזואליזציות
+                                        top: "50%",
+                                        transform: "translateY(-50%)",
+                                        width: 0,
+                                        height: 0,
+                                        borderTop: "10px solid transparent",
+                                        borderBottom: "10px solid transparent",
+                                        borderLeft: `14px solid ${SELECTED_ROUTE_COLOR}`,
+                                        zIndex: 100
+                                    }}
+                                />
+                            )}
+                            
                             <div style={{ fontWeight: 950 }}>מסלול {routeHebrew(id)}</div>
                             <div style={{ opacity: 0.85, fontWeight: 900, fontSize: 12 }}>
                                 {r ? fmtMinSecFromSeconds(r.totalTimeS) : "--:--"}
@@ -4313,6 +4336,14 @@ function createWideBadge(width: 120, height: 20): ImageData {
 }
 
 
+function SegmentLabel({ n }: { n: number }) {
+    return (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 7, justifyContent: "center" }}>
+            <span style={{ fontWeight: 900, opacity: 0.9 }}>מקטע</span>
+            <SegmentCircle n={n} />
+        </div>
+    );
+}
 // ▲▲▲ סוף הקוד לראש הקובץ ▲▲▲
 export default function App() {
     const mapDivRef = useRef<HTMLDivElement | null>(null);
