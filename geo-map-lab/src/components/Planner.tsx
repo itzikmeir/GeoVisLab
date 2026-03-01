@@ -3784,7 +3784,7 @@ function VisualizationModal(props: {
 
         return (
             <Card
-                title="זמני מקטעים"
+                title={t('planner.viz.cards.timesTable')}
                 subtitle="גרף נערם אופקי מימין לשמאל. לחץ על שורה כדי לבחור מסלול."
             >
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -3924,7 +3924,7 @@ function VisualizationModal(props: {
         const maxTotal = VIZ_CRITERIA_T.length * 100; // additive, each metric is 0..100
 
         return (
-            <Card title="גרף עמודות" subtitle="גרף עמודות נערמות (נערם מתווסף, לא נירמול ל־100%).">
+            <Card title={t('planner.viz.cards.barChart')} subtitle="גרף עמודות נערמות (נערם מתווסף, לא נירמול ל־100%).">
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 14, alignItems: "start" }}>
                     <div style={{ overflowX: "auto" }}>
                         <div style={{ display: "flex", gap: 14, alignItems: "flex-end", paddingBottom: 6 }}>
@@ -4037,7 +4037,7 @@ function VisualizationModal(props: {
         };
 
         return (
-            <Card title="גרף רדאר" subtitle="3 רדארים (מקטע 1–3). בכל רדאר מוצגים ציוני הקטגוריות.">
+            <Card title={t('planner.viz.cards.radarChart')} subtitle="3 רדארים (מקטע 1–3). בכל רדאר מוצגים ציוני הקטגוריות.">
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 14, alignItems: "start" }}>
                     <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "space-evenly" }}>
                         {segs.map((s) => (
@@ -4053,7 +4053,7 @@ function VisualizationModal(props: {
                             >
                                 <div style={{ fontWeight: 950, marginBottom: 8, textAlign: "right" }}>
                                     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                                        <span style={{ fontWeight: 950 }}>מקטע</span>
+                                        <span style={{ fontWeight: 950 }}>{t('planner.viz.segment')}</span>
                                         <SegmentCircle n={s.segment} />
                                     </span>
                                 </div>
@@ -4153,7 +4153,7 @@ function VisualizationModal(props: {
         const colW = 96;
 
         return (
-            <Card title="מפת חום" subtitle="טבלה עם עמודות ברוחב קבוע. המספרים תמיד בולטים (רקע לא כהה מדי).">
+            <Card title={t('planner.viz.cards.heatmap')} subtitle="טבלה עם עמודות ברוחב קבוע. המספרים תמיד בולטים (רקע לא כהה מדי).">
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 14, alignItems: "start" }}>
                     <div style={{ overflowX: "auto" }}>
                         <table
@@ -4167,7 +4167,7 @@ function VisualizationModal(props: {
                             <thead>
                                 <tr>
                                     <th style={{ textAlign: "right", fontSize: 12, opacity: 0.9, padding: 2, width: 78 }}>
-                                        מקטע
+                                        {t('planner.viz.segment')}
                                     </th>
                                     {VIZ_CRITERIA_T.map((m) => (
                                         <th key={m.key} style={{ textAlign: "center", fontSize: 12, padding: 2, width: colW }}>
@@ -4198,7 +4198,7 @@ function VisualizationModal(props: {
                                     <tr key={s.segment}>
                                         <td style={{ padding: 2, textAlign: "right", width: 78 }}>
                                             <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                                                <span style={{ fontWeight: 900, opacity: 0.9 }}>מקטע</span>
+                                                <span style={{ fontWeight: 900, opacity: 0.9 }}>{t('planner.viz.segment')}</span>
                                                 <SegmentCircle n={s.segment} />
                                             </div>
                                         </td>
@@ -4264,7 +4264,7 @@ function VisualizationModal(props: {
                 onClick={(e) => e.stopPropagation()}
             >
                 <div style={{ padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                    <div style={{ fontWeight: 950, fontSize: 16 }}>ויזואליזציות</div>
+                    <div style={{ fontWeight: 950, fontSize: 16 }}>{t('planner.viz.modal.title')}</div>
                     <button
                         onClick={onClose}
                         style={{
@@ -4277,7 +4277,7 @@ function VisualizationModal(props: {
                             fontWeight: 900,
                         }}
                     >
-                        סגור
+                        {t('planner.viz.modal.close')}
                     </button>
                 </div>
 
@@ -4291,16 +4291,16 @@ function VisualizationModal(props: {
                     }}
                 >
                     <ModalButton active={tab === "times"} onClick={() => setTab("times")}>
-                        זמני מקטעים
+                        {t('planner.viz.modal.tabTimes')}
                     </ModalButton>
                     <ModalButton active={tab === "bars"} onClick={() => setTab("bars")}>
-                        גרף עמודות
+                        {t('planner.viz.modal.tabBars')}
                     </ModalButton>
                     <ModalButton active={tab === "radar"} onClick={() => setTab("radar")}>
-                        גרף רדאר
+                        {t('planner.viz.modal.tabRadar')}
                     </ModalButton>
                     <ModalButton active={tab === "heatmap"} onClick={() => setTab("heatmap")}>
-                        מפת חום
+                        {t('planner.viz.modal.tabHeatmap')}
                     </ModalButton>
                 </div>
 
@@ -9135,7 +9135,7 @@ export default function App() {
                                             <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse", textAlign: "right" }}>
                                                 <thead>
                                                     <tr style={{ color: "#94a3b8" }}>
-                                                        <th style={{ padding: 4 }}>מסלול</th>
+                                                        <th style={{ padding: 4 }}>{t('planner.results.route')}</th>
                                                         <th style={{ padding: 4 }}>ק"מ</th>
                                                         <th style={{ padding: 4 }}>דקות</th>
                                                         <th style={{ padding: 4 }}>ציון</th>
@@ -9638,7 +9638,7 @@ export default function App() {
                                                     fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
                                                 }}
                                             >
-                                                בחר תיקייה…
+                                                {t('planner.export.chooseFolder')}
                                             </button>
 
                                             <button
@@ -9654,7 +9654,7 @@ export default function App() {
                                                     fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
                                                 }}
                                             >
-                                                ברירת מחדל
+                                                {t('planner.export.default')}
                                             </button>
                                         </div>
                                     </div>
@@ -9676,7 +9676,7 @@ export default function App() {
                                             color: "#e8eefc", cursor: "pointer", fontWeight: 900, fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif"
                                         }}
                                     >
-                                        ייצוא מסך למשתתף (HTML)
+                                        {t('planner.export.exportHtml')}
                                     </button>
 
                                     {/* כפתור 2: שמירת תרחיש מלא (החדש) */}
@@ -9699,7 +9699,7 @@ export default function App() {
                                             <polyline points="17 21 17 13 7 13 7 21" />
                                             <polyline points="7 3 7 8 15 8" />
                                         </svg>
-                                        שמור תרחיש מלא (JSON)
+                                        {t('planner.export.saveJson')}
                                     </button>
 
                                     {/* כפתור 3: ביטול */}
@@ -9712,7 +9712,7 @@ export default function App() {
                                             color: "#e8eefc", cursor: "pointer", fontWeight: 900, fontFamily: "Arial, sans-serif"
                                         }}
                                     >
-                                        ביטול
+                                        {t('planner.export.cancel')}
                                     </button>
                                 </div>
 
