@@ -28,7 +28,7 @@ const generateBatch = async () => {
 
     try {
       // 1. טעינת התבנית
-      const templateResponse = await fetch('/template.html');
+      const templateResponse = await fetch('./template.html');
       if (!templateResponse.ok) throw new Error("לא נמצא קובץ template.html בתיקיית public");
       const templateText = await templateResponse.text();
 
