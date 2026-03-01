@@ -3629,6 +3629,8 @@ function RoutePickerRight(props: {
     title?: string;
 }) {
     const { routeScores, selectedRoute, onSelectRoute, title } = props;
+    const { t, dir } = useLanguage();
+    const isRtl = dir === 'rtl';
     const byRoute = useMemo(() => {
         const m = new Map<BadgeId, RouteScore>();
         for (const r of routeScores) m.set(r.route, r);
@@ -3645,7 +3647,7 @@ function RoutePickerRight(props: {
                 height: "fit-content",
             }}
         >
-            <div style={{ fontWeight: 950, marginBottom: 10, opacity: 0.9 }}>{title ?? "בחירת מסלול"}</div>
+            <div style={{ fontWeight: 950, marginBottom: 10, opacity: 0.9 }}>{title ?? t('planner.triple.routePickerTitle')}</div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {(["A", "B", "C"] as BadgeId[]).map((id) => {
@@ -3667,7 +3669,7 @@ function RoutePickerRight(props: {
                                 background: isSel ? "rgba(30,78,216,0.12)" : "rgba(0,0,0,0.0)",
                                 position: "relative" // <--- 1. חובה להוסיף position relative
                             }}
-                            title="לחץ כדי לבחור מסלול"
+                            title={t('planner.triple.clickToSelectRoute')}
                         >
                             {/* --- 2. תוספת של המשולש המקשר (יופיע רק על המסלול הנבחר) --- */}
                             {isSel && (
@@ -3687,7 +3689,7 @@ function RoutePickerRight(props: {
                                 />
                             )}
                             
-                            <div style={{ fontWeight: 950 }}>מסלול {routeHebrew(id)}</div>
+                            <div style={{ fontWeight: 950 }}>{t('planner.results.route')} {isRtl ? routeHebrew(id) : id}</div>
                             <div style={{ opacity: 0.85, fontWeight: 900, fontSize: 12 }}>
                                 {r ? fmtMinSecFromSeconds(r.totalTimeS) : "--:--"}
                             </div>
@@ -4667,6 +4669,18 @@ export default function App() {
     const TASK_CAT_OPTIONS: TaskCat[] = ["מהיר", "חסכוני", "נופי", "מחובר"];
     const TASK_SCOPE_OPTIONS: TaskScope[] = ["כל המקטעים", "מקטע 1", "מקטע 2", "מקטע 3"];
     const TASK_DIFFICULTY_OPTIONS: TaskDifficulty[] = ["High", "Medium", "Low"];
+    const TASK_CAT_LABELS: Record<string, string> = {
+        "מהיר": t('planner.task.catFast'),
+        "חסכוני": t('planner.task.catEconomy'),
+        "נופי": t('planner.task.catScenic'),
+        "מחובר": t('planner.task.catComm'),
+    };
+    const TASK_SCOPE_LABELS: Record<string, string> = {
+        "כל המקטעים": t('planner.task.allSegments'),
+        "מקטע 1": t('planner.task.segment1'),
+        "מקטע 2": t('planner.task.segment2'),
+        "מקטע 3": t('planner.task.segment3'),
+    };
     // הוספת Elimination לתפריט:
     const TASK_MODE_OPTIONS: TaskMode[] = ["Elimination", "Weighted", "Lexicographic"];
 
@@ -4695,7 +4709,7 @@ export default function App() {
     // --- Export results to CSV (for external Excel analysis) ---
     const exportResultsToCsv = useCallback(() => {
         if (!routeScores || routeScores.length === 0) {
-            alert("אין נתונים לייצוא. לחץ/י קודם על 'הצג תוצאות' כדי לחשב נתונים.");
+            showToast(t('planner.toast.noDataExport'));
             return;
         }
 
@@ -4877,7 +4891,7 @@ export default function App() {
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-    }, [routeScores]);
+    }, [routeScores, showToast, t]);
 
     // שער פסילה: אם קטגוריה "חובה" לא קיימת (למשל 0% כיסוי), המסלול נפסל – אלא אם אין אף מסלול שעובר את השער.
     const [taskGateMinFrac, setTaskGateMinFrac] = useState<number>(0.8);
@@ -5801,13 +5815,13 @@ export default function App() {
                         setManualParks(prev => [...prev, newPark]);
                         addManualParkMarker(newPark);
 
-                        showToast("הפארק הועתק לעריכה ידנית בהצלחה!");
+                        showToast(t('planner.toast.parkCopied'));
                         //setIsPickingPark(false);
                     } else {
-                        showToast("לא ניתן לחלץ גיאומטריה מפארק זה.");
+                        showToast(t('planner.toast.noGeometry'));
                     }
                 } else {
-                    showToast("לא זוהה פארק בנקודה זו.");
+                    showToast(t('planner.toast.noPark'));
                 }
                 return; // עצור כאן
             }
@@ -5846,22 +5860,22 @@ export default function App() {
                 const id = ((feats && feats[0] && (feats[0].properties as any)?.id) as string) || "";
 
                 if (!id) {
-                    showToast("לא נמצאה ישות למחיקה. נסה ללחוץ על הישות עצמה.");
+                    showToast(t('planner.toast.noEntityToDelete'));
                     return;
                 }
 
                 if (delMode === "traffic") {
                     setCatTrafficSegs((prev) => prev.filter((s) => s.id !== id));
-                    showToast("נמחק מקטע עומס.");
+                    showToast(t('planner.toast.deletedTraffic'));
                 } else if (delMode === "toll") {
                     setCatTollSegs((prev) => prev.filter((s) => s.id !== id));
-                    showToast("נמחק מקטע אגרה.");
+                    showToast(t('planner.toast.deletedToll'));
                 } else if (delMode === "comm") {
                     setCatCommZones((prev) => prev.filter((z) => z.id !== id));
-                    showToast("נמחק אזור תקשורת.");
+                    showToast(t('planner.toast.deletedComm'));
                 } else if (delMode === "park") {
                     setManualParks((prev) => prev.filter((pp) => pp.id !== id));
-                    showToast("נמחק פארק.");
+                    showToast(t('planner.toast.deletedPark'));
                 }
 
                 return;
@@ -5876,12 +5890,12 @@ export default function App() {
                 if (drawMode === "comm") {
                     if (!draftCommCenterRef.current) {
                         setDraftCommCenter(ll);
-                        showToast("מרכז נקבע. לחץ שוב כדי לקבוע רדיוס.");
+                        showToast(t('planner.toast.commCenterSet'));
                     } else {
                         const center = draftCommCenterRef.current;
                         const r = haversineMeters(center, ll);
                         if (r < 20) {
-                            showToast("רדיוס קטן מדי. נסה לבחור נקודה רחוקה יותר.");
+                            showToast(t('planner.toast.commRadiusTooSmall'));
                             return;
                         }
                         const ring = circleRing(center, r);
@@ -5889,7 +5903,7 @@ export default function App() {
                         setCatCommZones((prev) => [...prev, { id, ring, radiusM: r }]);
                         setDraftCommCenter(null);
                         setEntityDrawMode(null);
-                        showToast("אזור תקשורת נוסף.");
+                        showToast(t('planner.toast.commZoneAdded'));
                     }
                     return;
                 }
@@ -5945,7 +5959,7 @@ export default function App() {
 
                 const snapped = snapToNearestRoadVertex();
                 if (!snapped) {
-                    showToast("לא ניתן למקם נקודה לא על ציר. התקרב לכביש ונסה שוב.");
+                    showToast(t('planner.toast.pointNotOnRoad'));
                     return;
                 }
 
@@ -5980,14 +5994,14 @@ export default function App() {
             if (!triplePickArmedRef.current) return;
 
             const s = startRef.current;
-            const t = endRef.current;
+            const tEnd = endRef.current;
 
             if (!s) {
                 setStart(ll);
                 setEnd(null);
                 return;
             }
-            if (!t) {
+            if (!tEnd) {
                 setEnd(ll);
                 setTriplePickArmed(false); // ברגע שנבחר יעד, מנטרלים כדי למנוע קליקים בטעות
                 return;
@@ -6012,16 +6026,16 @@ export default function App() {
                 ev.preventDefault();
                 const pts = draftEntityPtsRef.current;
                 if (!pts || pts.length < 2) {
-                    showToast("צריך לפחות 2 נקודות כדי לסיים מקטע.");
+                    showToast(t('planner.toast.needMinPoints'));
                     return;
                 }
                 const id = `${drawMode}_manual_${Date.now()}`;
                 if (drawMode === "traffic") {
                     setCatTrafficSegs((prev) => [...prev, { id, coords: pts }]);
-                    showToast("מקטע עומס נוסף.");
+                    showToast(t('planner.toast.trafficAdded'));
                 } else {
                     setCatTollSegs((prev) => [...prev, { id, coords: pts }]);
-                    showToast("מקטע אגרה נוסף.");
+                    showToast(t('planner.toast.tollAdded'));
                 }
                 setDraftEntityPts([]);
                 setEntityDrawMode(null);
@@ -6898,7 +6912,7 @@ export default function App() {
     const chooseExportFolder = useCallback(async () => {
         const picker = (window as any).showDirectoryPicker as undefined | ((opts?: any) => Promise<any>);
         if (!picker) {
-            alert("בחירת תיקייה לשמירה אינה נתמכת בדפדפן זה. הקובץ יירד כהורדה רגילה (Downloads).");
+            showToast(t('planner.toast.noBrowserFolderPicker'));
             setExportSaveMode("downloads");
             setExportDirHandle(null);
             setExportSavePath("Downloads");
@@ -6914,7 +6928,7 @@ export default function App() {
         } catch {
             // canceled
         }
-    }, []);
+    }, [showToast, t]);
 
     const resetExportSavePath = useCallback(() => {
         setExportSaveMode("downloads");
@@ -7132,7 +7146,7 @@ export default function App() {
         const fileName = `Scenario_${safeFileName(exportScenarioName)}_${new Date().toISOString().slice(0, 10)}.json`;
 
         downloadBlobAsFile(fileName, blob);
-        showToast("התרחיש נשמר בהצלחה!");
+        showToast(t('planner.toast.scenarioSaved'));
     }, [
         exportScenarioName, start, end, routeScores, selectedRoute,
         taskPrimaryCat, taskPrimaryScope, taskSecondaryCat, taskLocalEnabled, taskLocalCat, taskLocalSegment,
@@ -7152,7 +7166,7 @@ export default function App() {
                 const json = JSON.parse(event.target?.result as string) as GeoVisScenario;
 
                 if (!json.version || !json.mapState) {
-                    alert("קובץ לא תקין או בפורמט ישן.");
+                    showToast(t('planner.toast.invalidFormat'));
                     return;
                 }
 
@@ -7255,12 +7269,12 @@ export default function App() {
                     // טריגר קטן לרענון סגמנטים
                     setCalcNonce(n => n + 0.001);
 
-                    showToast(`נטען תרחיש: ${json.meta.name}`);
+                    showToast(t('planner.toast.scenarioLoaded').replace('{name}', json.meta.name));
                 }, 150);
 
             } catch (err) {
                 console.error(err);
-                alert("שגיאה בטעינת הקובץ. וודא שזהו קובץ JSON תקין של המערכת.");
+                showToast(t('planner.toast.loadError'));
             }
         };
         reader.readAsText(file);
@@ -7268,12 +7282,12 @@ export default function App() {
         // איפוס האינפוט כדי שאפשר יהיה לטעון את אותו קובץ שוב אם צריך
         e.target.value = '';
 
-    }, [mapRef, start, end, selectedRoute, showToast]);
+    }, [mapRef, start, end, selectedRoute, showToast, t]);
 
     const exportParticipantHtml = async () => {
         const map = mapRef.current;
         if (!map) {
-            alert("המפה עדיין לא מוכנה.");
+            showToast(t('planner.toast.mapNotReady'));
             return;
         }
 
@@ -7338,7 +7352,7 @@ export default function App() {
 
         } catch (e) {
             console.error("Export failed", e);
-            alert("שגיאת אבטחה (CORS): השרת של המפה חוסם ייצוא תמונה. נסה להחליף סגנון מפה.");
+            showToast(t('planner.toast.corsError'));
             return;
         }
 
@@ -7376,7 +7390,7 @@ export default function App() {
         if (exportVizSelection.HEATMAP) tasks.push({ type: "HEATMAP", suffix: "H" });
 
         if (tasks.length === 0) {
-            alert("אנא בחר לפחות סוג ויזואליזציה אחד לייצוא.");
+            showToast(t('planner.toast.noVizSelected'));
             return;
         }
 
@@ -7445,7 +7459,7 @@ export default function App() {
 
         setExportStatus(null);
         setExportOpen(false);
-        showToast(`הייצוא הושלם! (${tasks.length} קבצים)`);
+        showToast(t('planner.toast.exportDone').replace('{count}', tasks.length.toString()));
     };
 
     // פונקציה ליצירת תרחיש חכם מבוסס מטלה
@@ -7455,7 +7469,7 @@ export default function App() {
 
         const lines = tripleLinesRef.current;
         if (!lines.A.length || !lines.B.length || !lines.C.length) {
-            alert("יש לחשב מסלולים (שלב 1) לפני פיזור ישויות.");
+            showToast(t('planner.toast.computeFirst'));
             return;
         }
 
@@ -7585,9 +7599,9 @@ export default function App() {
         setShowResults(false);
         setRouteScores([]);
 
-        showToast(`בוצע: איזון ופיזור מלא (עומסים + אגרות + תקשורת).`);
+        showToast(t('planner.toast.balanceDone'));
 
-    }, [mapRef, tripleLinesRef, taskPrimaryCat, scatterDensity, keepManualEntities, buildTollLabelsFromSegs, showToast]);
+    }, [mapRef, tripleLinesRef, taskPrimaryCat, scatterDensity, keepManualEntities, buildTollLabelsFromSegs, showToast, t]);
     // ...
     // מחיקת תוצאות בכל שינוי משמעותי
     useEffect(() => {
@@ -7603,7 +7617,7 @@ export default function App() {
     // ...
 
     return (
-        <div style={{ display: "flex", width: "100vw", height: "100%", overflow: "hidden", fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif !important"}}>
+        <div style={{ display: "flex", flexDirection: isRtl ? "row" : "row-reverse", width: "100vw", height: "100%", overflow: "hidden", fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif !important"}}>
             {/* --- תדביק את זה כאן, מיד בהתחלה --- */}
             <style>{`
                         * {
@@ -8115,7 +8129,7 @@ export default function App() {
                     </div>
 
                     <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8, lineHeight: 1.35 }}>
-                        טיפ: שכבות בסיס וקטגוריות מרחביות ניתנות לניהול מתוך החלון.
+                        {t('planner.mapData.layersTip')}
                     </div>
                 </div>
 
@@ -8169,7 +8183,7 @@ export default function App() {
                                 </button>
                             </div>
 
-                            <div style={{ fontWeight: 900, marginBottom: 8 }}>שכבות בסיס</div>
+                            <div style={{ fontWeight: 900, marginBottom: 8 }}>{t('planner.mapData.baseLayers')}</div>
                             <div style={{ display: "grid", gap: 8 }}>
                                 {[
                                     { key: "roads", label: t('planner.mapData.roads'), v: showRoads, set: setShowRoads },
@@ -8185,9 +8199,9 @@ export default function App() {
                             </div>
 
                             <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.12)" }}>
-                                <div style={{ fontWeight: 900, marginBottom: 8 }}>קטגוריות מרחביות</div>
+                                <div style={{ fontWeight: 900, marginBottom: 8 }}>{t('planner.mapData.spatialCategories')}</div>
                                 <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>
-                                    הצגה/הסתרה של שכבות קטגוריות (זמין אחרי חישוב 3 מסלולים).
+                                    {t('planner.mapData.spatialLayersTip')}
                                 </div>
 
                                 <div style={{ display: "grid", gap: 8 }}>
@@ -8368,8 +8382,8 @@ export default function App() {
                         </div>
 
                         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                            <div style={{ fontWeight: 900, marginBottom: 6 }}>שלב 2: בחירת מסלול</div>
-                            <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>חלוקת מקטעים (1/2/3 + טיקים) מוצגת רק למסלול שנבחר.</div>
+                            <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.triple.step2')}</div>
+                            <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>{t('planner.triple.routeSelectHint')}</div>
 
                             <div style={{ fontWeight: 800, marginBottom: 8 }}>{t('planner.triple.selectRoute')}</div>
                             <div style={{ display: "flex", gap: 10, marginBottom: 4 }}>
@@ -8400,7 +8414,7 @@ export default function App() {
                         </div>
 
                         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                            <div style={{ fontWeight: 900, marginBottom: 6 }}>שלב 3: עריכת מסלולים</div>
+                            <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.triple.step3')}</div>
 
                             <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
                                 <button
@@ -8425,7 +8439,7 @@ export default function App() {
                                         fontWeight: 900,
                                         opacity: isRoutingTriple ? 0.7 : 1,
                                     }}
-                                    title="מצב עריכה: לחץ על עיגולים במסלול כדי למחוק/להחזיר צמתים"
+                                    title={t('planner.triple.editRouteTip')}
                                 >
                                     {isEditMode ? t('planner.triple.endEdit') : t('planner.triple.editRoute')}
                                 </button>
@@ -8444,9 +8458,9 @@ export default function App() {
                                         fontWeight: 900,
                                         opacity: !isEditMode ? 0.6 : 1,
                                     }}
-                                    title="ביטול כל השינויים וחזרה לפתרון המערכת"
+                                    title={t('planner.triple.cancelChanges')}
                                 >
-                                    חזרה לפתרון מערכת
+                                    {t('planner.triple.cancelChanges')}
                                 </button>
                             </div>
 
@@ -8472,9 +8486,9 @@ export default function App() {
                                                 fontWeight: 900,
                                                 opacity: editHistPos <= 0 ? 0.55 : 1,
                                             }}
-                                            title="חזור צעד אחורה"
+                                            title={t('planner.triple.undo')}
                                         >
-                                            חזור
+                                            {t('planner.triple.undo')}
                                         </button>
 
                                         <button
@@ -8491,9 +8505,9 @@ export default function App() {
                                                 fontWeight: 900,
                                                 opacity: editHistPos >= editHistory.length - 1 ? 0.55 : 1,
                                             }}
-                                            title="קדימה (אחרי חזור)"
+                                            title={t('planner.triple.redo')}
                                         >
-                                            קדימה
+                                            {t('planner.triple.redo')}
                                         </button>
                                     </div>
                                 </>
@@ -8503,11 +8517,11 @@ export default function App() {
 
 
                         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                            <div style={{ fontWeight: 900, marginBottom: 4 }}>שלב 4: עריכה ידנית של ישויות</div>
+                            <div style={{ fontWeight: 900, marginBottom: 4 }}>{t('planner.triple.step4')}</div>
                             <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 12, lineHeight: 1.4 }}>
-                                הוספה ומחיקה של ישויות על המפה.
+                                {t('planner.edit.desc')}
                                 <br />
-                                נוצרו: <b>{catTrafficSegs.length}</b> עומס, <b>{catTollSegs.length}</b> אגרה, <b>{catCommZones.length}</b> תקשורת, <b>{manualParks.length}</b> פארקים.
+                                נוצרו: <b>{catTrafficSegs.length}</b> {t('planner.categories.traffic')}, <b>{catTollSegs.length}</b> {t('planner.categories.toll')}, <b>{catCommZones.length}</b> {t('planner.categories.comm')}, <b>{manualParks.length}</b> {t('planner.categories.parks')}.
                             </div>
 
                             {/* רשימת הקטגוריות - שורות במקום כרטיסיות */}
@@ -8595,14 +8609,14 @@ export default function App() {
                                                         if(next) {
                                                             setDraftParkPts([]);
                                                             draftMouseRef.current = null;
-                                                            showToast("מצב ציור פארק: הקלק להוספת נקודות, דאבל-קליק לסיום.");
+                                                            showToast(t('planner.toast.parkDrawMode'));
                                                         }
                                                         return;
                                                     }
 
                                                     setIsDrawingPark(false);
                                                     setEntityDrawMode(c.key as any);
-                                                    showToast(c.key === "comm" ? "הוספת תקשורת: סמן מרכז ורדיוס." : "הוספת מקטע: סמן נקודות על הכביש.");
+                                                    showToast(c.key === "comm" ? t('planner.toast.addCommZone') : t('planner.toast.addSegment'));
                                                 }}
                                                 style={{
                                                     padding: "6px 10px",
@@ -8627,7 +8641,7 @@ export default function App() {
                                                         setIsDrawingPark(false);
                                                         setDeleteCatMode(null);
                                                         setEntityDrawMode(null);
-                                                        if (next) showToast("לחץ על שטח ירוק במפה כדי להעתיק אותו.");
+                                                        if (next) showToast(t('planner.toast.clickToCopyPark'));
                                                     }}
                                                     style={{
                                                         padding: "6px 10px",
@@ -8653,7 +8667,7 @@ export default function App() {
                                                     setIsDrawingPark(false);
                                                     setIsPickingPark(false);
                                                     setDeleteCatMode((prev) => (prev === (c.key as any) ? null : (c.key as any)));
-                                                    showToast("מצב מחיקה: לחץ על ישות במפה.");
+                                                    showToast(t('planner.toast.deleteMode'));
                                                 }}
                                                 style={{
                                                     padding: "6px 10px",
@@ -8690,7 +8704,7 @@ export default function App() {
                                             setDraftEntityPts([]);
                                             setDraftCommCenter(null);
                                             setIsDrawingPark(false);
-                                            showToast("כל הישויות נמחקו.");
+                                            showToast(t('planner.toast.allDeleted'));
                                         }
                                     }}
                                     style={{
@@ -8705,7 +8719,7 @@ export default function App() {
                                         cursor: "pointer",
                                     }}
                                 >
-                                    מחק הכל
+                                    {t('planner.categories.deleteAll')}
                                 </button>
 
                                 <button
@@ -8715,7 +8729,7 @@ export default function App() {
                                         setDraftEntityPts([]);
                                         setDraftCommCenter(null);
                                         setIsDrawingPark(false);
-                                        showToast("מצבי עריכה בוטלו.");
+                                        showToast(t('planner.toast.editsCancelled'));
                                     }}
                                     style={{
                                         flex: 1,
@@ -8729,7 +8743,7 @@ export default function App() {
                                         cursor: "pointer",
                                     }}
                                 >
-                                    בטל מצבים
+                                    {t('planner.categories.cancelModes')}
                                 </button>
                             </div>
                         </div>
@@ -8738,17 +8752,15 @@ export default function App() {
                         <div>
 
                             <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                                <div style={{ fontWeight: 900, marginBottom: 8 }}>שלב 5: הגדרת מטלה וחישוב מסלול מיטבי</div>
+                                <div style={{ fontWeight: 900, marginBottom: 8 }}>{t('planner.triple.step5')}</div>
 
                                 <div style={{ fontSize: 13, opacity: 0.92, lineHeight: 1.45 }}>
-                                    כאן אתה מגדיר את המטלה לנבדק (גלובלית/לוקאלית).
-                                    <b>בתרחיש זה אין פריסה אוטומטית של ישויות</b> — ישויות מרחביות נבנות ידנית בשלב 5.
-                                    את החישוב וההמלצה תפעיל בשלב 6 ("תוצאות").
+                                    {t('planner.task.desc')}
                                 </div>
 
                                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 10, marginTop: 10 }}>
                                     <div>
-                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>קריטריון ראשי</div>
+                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>{t('planner.task.mainCriterion')}</div>
                                         <select
                                             value={taskPrimaryCat}
                                             onChange={(e) => setTaskPrimaryCat(e.target.value as any)}
@@ -8756,14 +8768,14 @@ export default function App() {
                                         >
                                             {TASK_CAT_OPTIONS.map((c) => (
                                                 <option key={c} value={c}>
-                                                    {c}
+                                                    {TASK_CAT_LABELS[c] ?? c}
                                                 </option>
                                             ))}
                                         </select>
                                     </div>
 
                                     <div>
-                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>תחום הקריטריון הראשי</div>
+                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>{t('planner.task.mainCriterionRange')}</div>
                                         <select
                                             value={taskPrimaryScope}
                                             onChange={(e) => setTaskPrimaryScope(e.target.value as any)}
@@ -8771,14 +8783,14 @@ export default function App() {
                                         >
                                             {TASK_SCOPE_OPTIONS.map((sc) => (
                                                 <option key={sc} value={sc}>
-                                                    {sc}
+                                                    {TASK_SCOPE_LABELS[sc] ?? sc}
                                                 </option>
                                             ))}
                                         </select>
                                     </div>
 
                                     <div>
-                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>קריטריון משני (אופציונלי)</div>
+                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>{t('planner.task.secondaryCriterion')}</div>
                                         <select
                                             value={taskSecondaryCat}
                                             onChange={(e) => setTaskSecondaryCat(e.target.value as any)}
@@ -8787,21 +8799,21 @@ export default function App() {
                                             <option value="None">None</option>
                                             {TASK_CAT_OPTIONS.map((c) => (
                                                 <option key={c} value={c}>
-                                                    {c}
+                                                    {TASK_CAT_LABELS[c] ?? c}
                                                 </option>
                                             ))}
                                         </select>
                                     </div>
 
                                     <div>
-                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>שובר שוויון</div>
+                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>{t('planner.task.tieBreaker')}</div>
                                         <select
                                             value={taskTieBreaker}
                                             onChange={(e) => setTaskTieBreaker(e.target.value as any)}
                                             style={{ width: "100%", padding: 8, borderRadius: 10, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(0,0,0,0.25)", color: "white" }}
                                         >
-                                            <option value="זמן">זמן קצר יותר</option>
-                                            <option value="מהירות">מהירות (ציון)</option>
+                                            <option value="זמן">{t('planner.task.tieBreakerShorter')}</option>
+                                            <option value="מהירות">{t('planner.task.tieBreakerSpeed')}</option>
                                         </select>
                                     </div>
                                 </div>
@@ -8809,13 +8821,13 @@ export default function App() {
                                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 10, marginTop: 10 }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                         <input type="checkbox" checked={taskLocalEnabled} onChange={(e) => setTaskLocalEnabled(e.target.checked)} />
-                                        <div style={{ fontSize: 13, whiteSpace: "nowrap" }}>הוסף דרישה לוקאלית (מקטע ספציפי)</div>
+                                        <div style={{ fontSize: 13, whiteSpace: "nowrap" }}>{t('planner.task.addLocal')}</div>
                                     </div>
 
                                     <div />
 
                                     <div style={{ opacity: taskLocalEnabled ? 1 : 0.5 }}>
-                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>קריטריון לוקאלי</div>
+                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>{t('planner.task.localCriterion')}</div>
                                         <select
                                             disabled={!taskLocalEnabled}
                                             value={taskLocalCat}
@@ -8824,23 +8836,23 @@ export default function App() {
                                         >
                                             {TASK_CAT_OPTIONS.map((c) => (
                                                 <option key={c} value={c}>
-                                                    {c}
+                                                    {TASK_CAT_LABELS[c] ?? c}
                                                 </option>
                                             ))}
                                         </select>
                                     </div>
 
                                     <div style={{ opacity: taskLocalEnabled ? 1 : 0.5 }}>
-                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>מקטע לוקאלי</div>
+                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>{t('planner.task.localSegment')}</div>
                                         <select
                                             disabled={!taskLocalEnabled}
                                             value={taskLocalSegment}
                                             onChange={(e) => setTaskLocalSegment(parseInt(e.target.value, 10) as any)}
                                             style={{ width: "100%", padding: 8, borderRadius: 10, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(0,0,0,0.25)", color: "white" }}
                                         >
-                                            <option value={1}>מקטע 1</option>
-                                            <option value={2}>מקטע 2</option>
-                                            <option value={3}>מקטע 3</option>
+                                            <option value={1}>{t('planner.task.segment1')}</option>
+                                            <option value={2}>{t('planner.task.segment2')}</option>
+                                            <option value={3}>{t('planner.task.segment3')}</option>
                                         </select>
                                     </div>
                                 </div>
@@ -8879,7 +8891,7 @@ export default function App() {
 
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 10, alignItems: "end" }}>
                                     <div>
-                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>משקל ראשי</div>
+                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>{t('planner.task.mainWeight')}</div>
                                         <input
                                             type="number"
                                             value={taskWPrimary}
@@ -8888,7 +8900,7 @@ export default function App() {
                                         />
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>משקל משני</div>
+                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>{t('planner.task.secondaryWeight')}</div>
                                         <input
                                             type="number"
                                             value={taskWSecondary}
@@ -8897,7 +8909,7 @@ export default function App() {
                                         />
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>משקל זמן</div>
+                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>{t('planner.task.timeWeight')}</div>
                                         <input
                                             type="number"
                                             value={taskWTime}
@@ -8921,7 +8933,7 @@ export default function App() {
                                         />
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>מסלול מועדף (אופציונלי)</div>
+                                        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>{t('planner.task.preferredRoute')}</div>
                                         <select
                                             value={taskFavorRoute}
                                             onChange={(e) => setTaskFavorRoute(e.target.value as any)}
@@ -8950,13 +8962,13 @@ export default function App() {
                                 boxSizing: "border-box" // Prevent padding overflow
                             }}>
                                 <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 12, color: "#cbd5e1" }}>
-                                    אוטומציה ואיזון מסלולים
+                                    {t('planner.automation.title')}
                                 </div>
 
                                 {/* שורה 1: צפיפות */}
                                 <div style={{ marginBottom: 10 }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                                        <span style={{ opacity: 0.8 }}>כמות הפרעות (צפיפות)</span>
+                                        <span style={{ opacity: 0.8 }}>{t('planner.automation.density')}</span>
                                         <span style={{ fontWeight: 700 }}>{scatterDensity}</span>
                                     </div>
                                     <input
@@ -8973,7 +8985,7 @@ export default function App() {
                                 {/* שורה 2: שונות זמנים */}
                                 <div style={{ marginBottom: 12 }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, marginBottom: 4 }}>
-                                        <span style={{ opacity: 0.8 }}>פער זמנים רצוי בין מסלולים</span>
+                                        <span style={{ opacity: 0.8 }}>{t('planner.automation.timeGap')}</span>
                                         <input
                                             type="number"
                                             value={targetTimeGap}
@@ -8984,7 +8996,7 @@ export default function App() {
                                             }}
                                         />
                                     </div>
-                                    <div style={{ fontSize: 10, opacity: 0.5 }}>דקות. (נמוך = מסלולים דומים בזמן, קשה יותר להחליט)</div>
+                                    <div style={{ fontSize: 10, opacity: 0.5 }}>{t('planner.automation.timeGapNote')}</div>
                                 </div>
 
                                 {/* שורה 3: צ'קבוקס */}
@@ -8997,7 +9009,7 @@ export default function App() {
                                         style={{ cursor: "pointer" }}
                                     />
                                     <label htmlFor="chkKeepManual" style={{ fontSize: 12, cursor: "pointer", opacity: 0.8 }}>
-                                        שמור ישויות ידניות
+                                        {t('planner.categories.keepEntities')}
                                     </label>
                                 </div>
 
@@ -9022,7 +9034,7 @@ export default function App() {
                             </div>
                             {/* --- שלב 6: תוצאות והמלצה (מעודכן) --- */}
                             <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 20 }}>
-                                <div style={{ fontWeight: 900, marginBottom: 6 }}>שלב 6: תוצאות והמלצה</div>
+                                <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.triple.step6')}</div>
                                 <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 12 }}>
                                     לחץ לחשיפת נתונים. כל שינוי במפה יאפס את התוצאות.
                                 </div>
@@ -9101,7 +9113,7 @@ export default function App() {
                                             opacity: tripleComputed ? 1 : 0.5
                                         }}
                                     >
-                                        📊 גרפים
+                                        {t('planner.results.vizBtn')}
                                     </button>
                                 </div>
 
@@ -9115,7 +9127,7 @@ export default function App() {
                                         animation: "fadeIn 0.5s ease-out"
                                     }}>
                                         <div style={{ fontWeight: 900, color: "#4ade80", fontSize: 14, marginBottom: 2 }}>
-                                            🏆 המלצה: מסלול {taskWinnerRoute === 'A' ? 'א' : taskWinnerRoute === 'B' ? 'ב' : 'ג'}
+                                            {t('planner.results.recommendation').replace('{route}', isRtl ? (taskWinnerRoute === 'A' ? 'א' : taskWinnerRoute === 'B' ? 'ב' : 'ג') : taskWinnerRoute ?? '')}
                                         </div>
                                         <div style={{ fontSize: 11, opacity: 0.8 }}>
                                             {taskWinnerNote}
@@ -9136,15 +9148,15 @@ export default function App() {
                                                 <thead>
                                                     <tr style={{ color: "#94a3b8" }}>
                                                         <th style={{ padding: 4 }}>{t('planner.results.route')}</th>
-                                                        <th style={{ padding: 4 }}>ק"מ</th>
-                                                        <th style={{ padding: 4 }}>דקות</th>
-                                                        <th style={{ padding: 4 }}>ציון</th>
+                                                        <th style={{ padding: 4 }}>{t('planner.results.km')}</th>
+                                                        <th style={{ padding: 4 }}>{t('planner.results.mins')}</th>
+                                                        <th style={{ padding: 4 }}>{t('planner.results.score')}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {routeScores.map(rs => (
                                                         <tr key={rs.route} style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                                                            <td style={{ padding: "6px 4px", fontWeight: 800 }}>{rs.route === 'A' ? 'א' : rs.route === 'B' ? 'ב' : 'ג'}</td>
+                                                            <td style={{ padding: "6px 4px", fontWeight: 800 }}>{isRtl ? (rs.route === 'A' ? 'א' : rs.route === 'B' ? 'ב' : 'ג') : rs.route}</td>
                                                             <td style={{ padding: 4 }}>{(rs.totalLengthM / 1000).toFixed(1)}</td>
                                                             <td style={{ padding: 4, color: "#fbbf24", fontWeight: 700 }}>{(rs.totalTimeS / 60).toFixed(0)}</td>
                                                             <td style={{ padding: 4 }}>
@@ -9160,7 +9172,7 @@ export default function App() {
                                         </div>
 
                                         <div style={{ marginTop: 8, fontSize: 11, opacity: 0.5, textAlign: "center" }}>
-                                            לפירוט מלא, לחץ על "ייצוא CSV" בכותרת.
+                                            {t('planner.results.detailHint')}
                                         </div>
                                     </div>
                                 )}
@@ -9199,7 +9211,7 @@ export default function App() {
                                     onMouseDown={(e) => e.stopPropagation()}
                                 >
                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
-                                        <div style={{ fontWeight: 900, fontSize: 16 }}>עריכה ידנית של ישויות</div>
+                                        <div style={{ fontWeight: 900, fontSize: 16 }}>{t('planner.edit.modalTitle')}</div>
                                         <button
                                             onClick={() => setShowCatSettings(false)}
                                             style={{
@@ -9218,14 +9230,13 @@ export default function App() {
                                     </div>
 
                                     <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>
-                                        כאן ניתן ליצור, לערוך ולמחוק ישויות מרחביות <b>ידנית בלבד</b>.
-                                        אין פיזור אוטומטי בשלב זה.
-                                        כרגע: <b>{catTrafficSegs.length}</b> עומסים, <b>{catTollSegs.length}</b> אגרות, <b>{catCommZones.length}</b> אזורי תקשורת, <b>{manualParks.length}</b> פארקים.
+                                        {t('planner.edit.modalDesc')}
+                                        {" "}כרגע: <b>{catTrafficSegs.length}</b> {t('planner.categories.traffic')}, <b>{catTollSegs.length}</b> {t('planner.categories.toll')}, <b>{catCommZones.length}</b> {t('planner.categories.comm')}, <b>{manualParks.length}</b> {t('planner.categories.parks')}.
                                     </div>
 
                                     {/* Manual parks controls */}
                                     <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.12)" }}>
-                                        <div style={{ fontWeight: 800, marginBottom: 8, textAlign: "right" }}>פארקים ידניים</div>
+                                        <div style={{ fontWeight: 800, marginBottom: 8, textAlign: "right" }}>{t('planner.categories.manualParksTitle')}</div>
 
                                         <button
                                             onClick={() => {
@@ -9254,7 +9265,7 @@ export default function App() {
                                             }}
                                             title={!tripleComputed ? "יש לחשב מסלולים לפני יצירת פארקים ידניים" : isDrawingPark ? "מצב ציור פעיל (דאבל קליק לסגירה, ESC לביטול)" : "הוסף פוליגון פארק ידני"}
                                         >
-                                            {isDrawingPark ? "סיים ציור" : "הוסף פארק"}
+                                            {isDrawingPark ? t('planner.categories.finishDrawing') : t('planner.categories.addPark')}
                                         </button>
 
                                         <button
@@ -9273,12 +9284,12 @@ export default function App() {
                                                 fontWeight: 900,
                                             }}
                                         >
-                                            נקה פארקים ידניים
+                                            {t('planner.categories.clearParks')}
                                         </button>
 
                                         {isDrawingPark && (
                                             <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85, textAlign: "right", lineHeight: 1.5 }}>
-                                                קליק: הוסף נקודה · דאבל־קליק: סגור פוליגון · Delete: חזור צעד · ESC: ביטול
+                                                {t('planner.categories.parkDrawInstructions')}
                                             </div>
                                         )}
                                     </div>
@@ -9290,18 +9301,18 @@ export default function App() {
 
                 {mode === "SINGLE" && (
                     <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                        <div style={{ fontWeight: 900, marginBottom: 6 }}>מסלול יחיד</div>
+                        <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.mode.single')}</div>
                         <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10 }}>
-                            כל קליק מוסיף waypoint. המערכת מנסה להצמיד ל־OSRM. אם נופל — קו ישר (fallback).
+                            {t('planner.mode.singleInstructions')}
                         </div>
 
-                        {isRoutingSingle && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 900 }}>מחשב מסלול…</div>}
+                        {isRoutingSingle && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 900 }}>{t('planner.mode.singleComputing')}</div>}
 
                         <div style={{ marginTop: 10, fontSize: 13 }}>
                             Waypoints: <b>{singleWaypoints.length}</b>
                         </div>
                         <div style={{ marginTop: 6, fontSize: 13 }}>
-                            אורך מסלול: <b>{fmtDistance(singleDist)}</b>
+                            {t('planner.mode.singleRouteLength')} <b>{fmtDistance(singleDist)}</b>
                         </div>
 
                         <button
@@ -9318,21 +9329,21 @@ export default function App() {
                                 fontWeight: 900,
                             }}
                         >
-                            ניקוי מסלול יחיד
+                            {t('planner.mode.singleClearBtn')}
                         </button>
                     </div>
                 )}
 
                 {mode === "MEASURE" && (
                     <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                        <div style={{ fontWeight: 900, marginBottom: 6 }}>מדידה</div>
-                        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10 }}>קליקים מוסיפים נקודות מדידה (חישוב גאודזי).</div>
+                        <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.mode.measure')}</div>
+                        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10 }}>{t('planner.mode.measureTip')}</div>
 
                         <div style={{ fontSize: 13 }}>
-                            נקודות: <b>{measurePts.length}</b>
+                            {t('planner.mode.measurePoints')} <b>{measurePts.length}</b>
                         </div>
                         <div style={{ marginTop: 6, fontSize: 13 }}>
-                            מרחק: <b>{fmtDistance(measureDist)}</b>
+                            {t('planner.mode.measureDistance')} <b>{fmtDistance(measureDist)}</b>
                         </div>
 
                         <button
@@ -9349,7 +9360,7 @@ export default function App() {
                                 fontWeight: 900,
                             }}
                         >
-                            ניקוי מדידה
+                            {t('planner.mode.measureClearBtn')}
                         </button>
                     </div>
                 )}
@@ -9358,7 +9369,7 @@ export default function App() {
                 <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
                     <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.export.title')}</div>
                     <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10, lineHeight: 1.45 }}>
-                        יצירת קובץ <b>HTML</b> עצמאי להצגת התרחיש לנבדק (מפה + בחירת מסלול + פירוט מקטעים).
+                        {t('planner.export.exportDesc')}
                     </div>
 
                     <button
@@ -9420,7 +9431,7 @@ export default function App() {
                             onMouseDown={(e) => e.stopPropagation()}
                         >
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-                                <div style={{ fontWeight: 900, fontSize: 16 }}>ייצוא מסך לנבדק</div>
+                                <div style={{ fontWeight: 900, fontSize: 16 }}>{t('planner.export.participantTitle')}</div>
                                 <button
                                     onClick={() => setExportOpen(false)}
                                     style={{
@@ -9541,7 +9552,7 @@ export default function App() {
                                                     onChange={(e) => setExportVizSelection(prev => ({ ...prev, STACKED: e.target.checked }))}
                                                     style={{ marginLeft: 8 }}
                                                 />
-                                                גרף עמודות (Stacked) - סיומת S
+                                                {t('planner.export.stacked')}
                                             </label>
 
                                             {/* Radar */}
@@ -9552,7 +9563,7 @@ export default function App() {
                                                     onChange={(e) => setExportVizSelection(prev => ({ ...prev, RADAR: e.target.checked }))}
                                                     style={{ marginLeft: 8 }}
                                                 />
-                                                גרף רדאר (Radar) - סיומת R
+                                                {t('planner.export.radar')}
                                             </label>
 
                                             {/* Table (Heatmap internal) */}
@@ -9563,7 +9574,7 @@ export default function App() {
                                                     onChange={(e) => setExportVizSelection(prev => ({ ...prev, HEATMAP: e.target.checked }))}
                                                     style={{ marginLeft: 8 }}
                                                 />
-                                                טבלה (Table) - סיומת H
+                                                {t('planner.export.heatmap')}
                                             </label>
                                         </div>
                                     </div>
@@ -9660,7 +9671,7 @@ export default function App() {
                                     </div>
 
                                     <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75, lineHeight: 1.4 }}>
-                                        הערה: בדפדפנים רבים לא ניתן לקרוא את הנתיב המלא של התיקייה שנבחרה. כאן ניתן להזין/לעדכן את הנתיב להצגה, והקובץ יישמר בתיקייה שנבחרה (אם נתמך) או ירד ל־Downloads.
+                                        {t('planner.export.pathNote')}
                                     </div>
                                 </div>
 

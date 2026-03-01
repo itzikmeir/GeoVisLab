@@ -4,7 +4,8 @@
       "Bash(npm run build)",
       "Bash(npm run deploy)",
       "Bash(git add -A)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git add src/App.tsx src/components/BatchGenerator.tsx src/components/ExportFileManager.tsx src/components/Planner.tsx src/main.tsx src/i18n/)"
     ]
   }
 }
