@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { useLanguage } from '../i18n/index.tsx';
 
 // ---- Export screen (participant) helpers ----
 declare global {
@@ -25,7 +26,7 @@ function buildParticipantHtml(args: {
     taskText: string;
     requirementsText: string;
     recommendedRoute: "A" | "B" | "C";
-    vizType: "STACKED" | "RADAR" | "HEATMAP" | string; // כאן הוספתי תמיכה לכל הסוגים
+    vizType: "STACKED" | "RADAR" | "HEATMAP" | string;
     baseMapDataUrl: string;
     mapView: { width: number; height: number; zoom: number; center: LngLat };
     start: LngLat | null;
@@ -38,14 +39,17 @@ function buildParticipantHtml(args: {
     catTollLabels: { coord: LngLat; side: "left" | "right" }[];
     catCommZones: { id: string; ring: LngLat[]; radiusM: number }[];
     routeScores: any[];
+    lang: string;
+    dir: 'rtl' | 'ltr';
+    strings: Record<string, any>;
 }) {
     const payload = {
         ...args,
         vizConfig: [
-            { key: "speedScore", label: "מהירות", desc: "מיעוט עומסים", color: "#3B82F6" },
-            { key: "economyScore", label: "חיסכון", desc: "מיעוט כבישי אגרה", color: "#F59E0B" },
-            { key: "scenicScore", label: "נוף", desc: "מעבר ליד פארקים", color: "#22C55E" },
-            { key: "commScore", label: "קליטה", desc: "מעגלי תקשורת מוגברת", color: "#A855F7" },
+            { key: "speedScore", label: args.strings.speed?.label ?? "מהירות", desc: args.strings.speed?.desc ?? "מיעוט עומסים", color: "#3B82F6" },
+            { key: "economyScore", label: args.strings.economy?.label ?? "חיסכון", desc: args.strings.economy?.desc ?? "מיעוט כבישי אגרה", color: "#F59E0B" },
+            { key: "scenicScore", label: args.strings.scenic?.label ?? "נוף", desc: args.strings.scenic?.desc ?? "מעבר ליד פארקים", color: "#22C55E" },
+            { key: "commScore", label: args.strings.commScore?.label ?? "קליטה", desc: args.strings.commScore?.desc ?? "מעגלי תקשורת מוגברת", color: "#A855F7" },
         ],
         colors: {
             routePalette: { A: "#3B82F6", B: "#F59E0B", C: "#A855F7" },
@@ -57,9 +61,10 @@ function buildParticipantHtml(args: {
             parks: { fill: "#00FF66", outline: "transparent", opacity: 0.95 },
         },
     };
-    const payloadJson = JSON.stringify(payload);
+    const payloadWithStrings = { ...payload, strings: args.strings, dir: args.dir };
+    const payloadJson = JSON.stringify(payloadWithStrings);
     return `<!doctype html>
-<html lang="he" dir="rtl">
+<html lang="${args.lang}" dir="${args.dir}">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -392,12 +397,30 @@ function buildParticipantHtml(args: {
             }
 
             /* 4. האייקונים (הפלוס/מינוס) - הכרחה לשחור */
-            .maplibregl-ctrl-icon, 
+            .maplibregl-ctrl-icon,
             div.maplibregl-ctrl-group button span {
-                filter: grayscale(100%) brightness(0) !important; /* הופך הכל לשחור */
+                filter: grayscale(100%) brightness(0) !important;
                 opacity: 1 !important;
-                background-color: transparent !important; /* שלא יסתיר את הרקע האפור */
+                background-color: transparent !important;
             }
+
+  /* ===== LTR overrides (English mode) ===== */
+  [dir="ltr"] .top { flex-direction: row-reverse; }
+  [dir="ltr"] .bottom { direction: ltr; }
+  [dir="ltr"] .ganttPanel { direction: ltr; }
+  [dir="ltr"] .vizPanel { direction: ltr; }
+  [dir="ltr"] .legendPanel { direction: ltr; }
+  [dir="ltr"] .taskPanel { direction: ltr; text-align: left; }
+  [dir="ltr"] .mapLegend { direction: ltr; text-align: left; right: auto; left: 10px; }
+  [dir="ltr"] .modal { direction: ltr; text-align: left; }
+  [dir="ltr"] .radar-wrapper { direction: ltr; }
+  [dir="ltr"] .ganttScroll { direction: ltr; }
+  [dir="ltr"] .gBar { direction: ltr; left: 0; right: auto; }
+  [dir="ltr"] .gAxis { margin-right: 0; margin-left: 60px; }
+  [dir="ltr"] .gAxis .gAxisUnitLabel { right: auto; left: -8px; }
+  [dir="ltr"] .filterBtn { left: auto; right: 10px; }
+  [dir="ltr"] .heatmap-table th:first-child, [dir="ltr"] .heatmap-table td:first-child { text-align: left !important; }
+  [dir="ltr"] .timer-container { direction: ltr; }
 </style>
 </head>
 <body>
@@ -411,20 +434,20 @@ function buildParticipantHtml(args: {
       </div>
 
       <div class="ctrlCol">
-        <button class="ctrlBtn" id="zoomIn" title="זום אין"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
-        <button class="ctrlBtn" id="fitView" title="מרכז מפה"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8v8H8z"/></svg></button>
-        <button class="ctrlBtn" id="zoomOut" title="זום אאוט"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+        <button class="ctrlBtn" id="zoomIn" title="${args.strings.zoomIn ?? 'זום אין'}"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="ctrlBtn" id="fitView" title="${args.strings.centerMap ?? 'מרכז מפה'}"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8v8H8z"/></svg></button>
+        <button class="ctrlBtn" id="zoomOut" title="${args.strings.zoomOut ?? 'זום אאוט'}"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
       </div>
 
-      <button class="filterBtn" id="openFilter" title="שכבות">
+      <button class="filterBtn" id="openFilter" title="${args.strings.layers ?? 'שכבות'}">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
       </button>
 
       <div class="mapLegend panel">
-        <div style="font-weight:700; margin-bottom:8px; opacity:0.9">מקרא מפה</div>
-        <div class="legRow"><div class="legLine" style="background:#8CCBFF"></div><span>מסלול</span></div>
-        <div class="legRow"><div class="legLine" style="background:#1E4ED8"></div><span>מסלול נבחר</span></div>
-        <div class="legRow"><div class="legLine" style="border-top:3px dashed #FF0022; height:0"></div><span>עומס</span></div>
+        <div style="font-weight:700; margin-bottom:8px; opacity:0.9">${args.strings.mapLegend ?? 'מקרא מפה'}</div>
+        <div class="legRow"><div class="legLine" style="background:#8CCBFF"></div><span>${args.strings.route ?? 'מסלול'}</span></div>
+        <div class="legRow"><div class="legLine" style="background:#1E4ED8"></div><span>${args.strings.selectedRoute ?? 'מסלול נבחר'}</span></div>
+        <div class="legRow"><div class="legLine" style="border-top:3px dashed #FF0022; height:0"></div><span>${args.strings.traffic ?? 'עומס'}</span></div>
        <div class="legRow">
            <div style="width:24px; position:relative; height:12px; display:flex; align-items:center; justify-content:center">
            
@@ -433,47 +456,47 @@ function buildParticipantHtml(args: {
              
              <div style="width:14px; height:14px; background:#FFE100; border:1px solid rgba(0,0,0,0.7); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#000; position:absolute; z-index:5; font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif;">₪</div>
            </div>
-           <span>אגרה</span>
+           <span>${args.strings.toll ?? 'אגרה'}</span>
         </div>
-        <div class="legRow"><div style="width:12px; height:12px; background:rgba(170,60,255,0.4); border:1px solid #A855F7; border-radius:50%"></div><span>תקשורת</span></div>
-        <div class="legRow"><div style="width:16px; height:10px; background:#00FF66; opacity:0.7"></div><span>פארק</span></div>
+        <div class="legRow"><div style="width:12px; height:12px; background:rgba(170,60,255,0.4); border:1px solid #A855F7; border-radius:50%"></div><span>${args.strings.comm ?? 'תקשורת'}</span></div>
+        <div class="legRow"><div style="width:16px; height:10px; background:#00FF66; opacity:0.7"></div><span>${args.strings.park ?? 'פארק'}</span></div>
       </div>
     </div>
 
     <div class="taskPanel panel">
-      <div class="h">מטלה</div>
+      <div class="h">${args.strings.task ?? 'מטלה'}</div>
       <div class="muted" id="taskText"></div>
     <div class="muted" id="requirementsText" style="font-weight:900; margin-top:8px; display:none; font-size:24px; font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif !important"></div>
     <div class="muted" id="requirementsText" style="font-weight:900; margin-top:8px; display:none; font-size:24px; font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif !important"></div>
-      <div class="small-note">אם יש יותר ממסלול אחד שעומד בדרישות, יש להעדיף את המסלול עם זמן הנסיעה הכולל הקצר מבינהם.</div>
+      <div class="small-note">${args.strings.taskInstruction ?? 'אם יש יותר ממסלול אחד שעומד בדרישות, יש להעדיף את המסלול עם זמן הנסיעה הכולל הקצר מבינהם.'}</div>
       <div class="sep"></div>
     <div class="recBox">
-        <div class="recLabel">המלצת המערכת</div>
+        <div class="recLabel">${args.strings.recommendation ?? 'המלצת המערכת'}</div>
         <div class="recVal" id="recRoute" style= "font-size:20px; color:#cbd5e1; font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif !important"></div>
       </div>
       
       <div class="sep" style="margin-top: 15px;"></div>
       
       <div style="font-size:14px; margin-top:5px; margin-bottom:-2px; opacity:0.9; font-weight: 600;">
-          💡 ניתן לבחור מסלול בלחיצה על הקו במפה או בגרף זמני המקטעים למטלה.
+          ${args.strings.selectTip ?? '💡 ניתן לבחור מסלול בלחיצה על הקו במפה או בגרף זמני המקטעים למטלה.'}
       </div>
 
       <div class="timer-container">
     <div class="timer-labels">
-        <span style="font-size: 14px; opacity: 0.9;">זמן מוערך למטלה:</span>
+        <span style="font-size: 14px; opacity: 0.9;">${args.strings.estimatedTime ?? 'זמן מוערך למטלה:'}</span>
         <span id="timerDisplay">00:30</span>
     </div>
     <div class="progress-bg">
         <div id="progressBar"></div>
     </div>
 </div>
-      <button class="btnPrimary" id="submitBtn">אישור בחירה</button>
+      <button class="btnPrimary" id="submitBtn">${args.strings.confirm ?? 'אישור בחירה'}</button>
     </div>
   </div>
 
   <div class="bottom">
     <div class="ganttPanel panel">
-         <div class="h" style="font-size:14px; margin-bottom:10px">זמני מקטעים</div>
+         <div class="h" style="font-size:14px; margin-bottom:10px">${args.strings.segmentTimes ?? 'זמני מקטעים'}</div>
          <div id="ganttContainer" class="ganttScroll"></div>
          <div id="ganttAxis" class="gAxis"></div>
     </div>
@@ -483,7 +506,7 @@ function buildParticipantHtml(args: {
     </div>
 
     <div class="legendPanel panel">
-      <div class="h" style="font-size:14px; margin-bottom:12px">מקרא ויזואליזציה</div>
+      <div class="h" style="font-size:14px; margin-bottom:12px">${args.strings.vizLegend ?? 'מקרא ויזואליזציה'}</div>
       <div id="vizLegendContent"></div>
     </div>
   </div>
@@ -491,28 +514,28 @@ function buildParticipantHtml(args: {
 
 <div class="backdrop" id="filterModal">
   <div class="modal" style="width:320px">
-    <div class="h">סינון שכבות</div>
+    <div class="h">${args.strings.filterTitle ?? 'סינון שכבות'}</div>
     <div style="margin:15px 0; display:flex; gap:10px; justify-content:center">
-        <button id="showAll" class="eyeBtn on" style="font-size:12px; border:1px solid #555; padding:6px 12px; border-radius:4px">הצג הכל</button>
-        <button id="hideAll" class="eyeBtn" style="font-size:12px; border:1px solid #555; padding:6px 12px; border-radius:4px">הסתר הכל</button>
+        <button id="showAll" class="eyeBtn on" style="font-size:12px; border:1px solid #555; padding:6px 12px; border-radius:4px">${args.strings.showAll ?? 'הצג הכל'}</button>
+        <button id="hideAll" class="eyeBtn" style="font-size:12px; border:1px solid #555; padding:6px 12px; border-radius:4px">${args.strings.hideAll ?? 'הסתר הכל'}</button>
     </div>
-    <div id="filterList" style="text-align:right"></div>
+    <div id="filterList" style="text-align:${args.dir === 'rtl' ? 'right' : 'left'}"></div>
     <div style="margin-top:20px">
-        <button class="mBtn no" id="closeFilter">סגור</button>
+        <button class="mBtn no" id="closeFilter">${args.strings.close ?? 'סגור'}</button>
     </div>
   </div>
 </div>
 
 <div class="backdrop" id="confirmModal">
   <div class="modal">
-    <div class="h" style="font-size:18px; margin-bottom:10px">אישור בחירה</div>
+    <div class="h" style="font-size:18px; margin-bottom:10px">${args.strings.confirmTitle ?? 'אישור בחירה'}</div>
     <p id="confirmText" style="margin-bottom:20px; font-size:16px"></p>
     <div id="confirmWarning" style="background:rgba(245,158,11,0.2); color:#FCD34D; padding:10px; border-radius:6px; margin-bottom:20px; display:none; font-size:14px; border:1px solid rgba(245,158,11,0.4)">
-        שים לב: בחרת במסלול שונה מהמלצת המערכת.
+        ${args.strings.confirmWarning ?? 'שים לב: בחרת במסלול שונה מהמלצת המערכת.'}
     </div>
     <div class="modalBtns">
-      <button class="mBtn yes" id="doConfirm">כן, אני בטוח</button>
-      <button class="mBtn no" id="cancelConfirm">ביטול</button>
+      <button class="mBtn yes" id="doConfirm">${args.strings.confirmYes ?? 'כן, אני בטוח'}</button>
+      <button class="mBtn no" id="cancelConfirm">${args.strings.confirmCancel ?? 'ביטול'}</button>
     </div>
   </div>
 </div>
@@ -567,7 +590,7 @@ if (els.requirementsText) {
   if (t) { els.requirementsText.style.display = 'block'; els.requirementsText.textContent = t; }
 }
 
-els.recRoute.textContent = 'מסלול ' + heb(DATA.recommendedRoute);
+els.recRoute.textContent = (DATA.strings.route ?? 'מסלול') + ' ' + routeLabel(DATA.recommendedRoute);
 
 // Projection Helpers
 function project(ll) {
@@ -585,7 +608,7 @@ function project(ll) {
         y: DATA.mapView.height / 2 + (p.y - c.y) * worldSize
     };
 }
-function heb(id) { return id === 'A' ? 'א' : id === 'B' ? 'ב' : 'ג'; }
+function routeLabel(id) { return DATA.dir === 'rtl' ? (id === 'A' ? 'א' : id === 'B' ? 'ב' : 'ג') : id; }
 
 function getTickLine(p1, p2, p3, len) {
     let vx1 = p2.x - p1.x, vy1 = p2.y - p1.y;
@@ -724,7 +747,7 @@ function drawMap() {
              const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
              rect.setAttribute('x', p.x-40); rect.setAttribute('y', p.y-13); rect.setAttribute('width', 80); rect.setAttribute('height', 26);
              rect.setAttribute('rx', 7); rect.setAttribute('fill', col); rect.setAttribute('stroke', 'rgba(0,0,0,0.3)');
-             const label = (b.label ? String(b.label) : ('מסלול ' + heb(b.id)));
+             const label = (b.label ? String(b.label) : ((DATA.strings.route ?? 'מסלול') + ' ' + routeLabel(b.id)));
              const t = text(p.x, p.y+6, label, 13, isSel ? '#fff' : '#000'); t.setAttribute('font-weight','900');
              g.append(rect, t);
              gOver.appendChild(g);
@@ -745,12 +768,12 @@ function drawMap() {
     });
 
     // מוצא ויעד
-    if(DATA.start) { const p = project(DATA.start); gOver.append(circle(p.x, p.y, 7, '#fff', '#000'), drawLabel(p.x, p.y-20, 'מוצא')); }
-    if(DATA.end) { 
-        const p = project(DATA.end); 
+    if(DATA.start) { const p = project(DATA.start); gOver.append(circle(p.x, p.y, 7, '#fff', '#000'), drawLabel(p.x, p.y-20, DATA.strings.origin ?? 'מוצא')); }
+    if(DATA.end) {
+        const p = project(DATA.end);
         const g = document.createElementNS('http://www.w3.org/2000/svg','g');
         g.innerHTML = '<path transform="translate('+(p.x-10)+','+(p.y-22)+') scale(0.85)" d="M12 0c-6.6 0-12 5.4-12 12 0 8 12 24 12 24s12-16 12-24c0-6.6-5.4-12-12-12zm0 16c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z" fill="#d11111" stroke="#000" stroke-width="1"/>';
-        gOver.append(g, drawLabel(p.x, p.y-30, 'יעד'));
+        gOver.append(g, drawLabel(p.x, p.y-30, DATA.strings.destination ?? 'יעד'));
     }
 }
 
@@ -807,7 +830,7 @@ function renderVizContainer() {
     const cats = DATA.vizConfig; 
 
     if (!segments.length) {
-        container.innerHTML = '<div style="text-align:center; opacity:0.6; margin-top:20px">אין נתונים</div>';
+        container.innerHTML = '<div style="text-align:center; opacity:0.6; margin-top:20px">' + (DATA.strings.noData ?? 'אין נתונים') + '</div>';
         return;
     }
 
@@ -818,7 +841,7 @@ function renderVizContainer() {
         hRow.appendChild(document.createElement('th')); 
         segments.forEach(seg => {
             const th = document.createElement('th');
-            th.innerHTML = '<span style="font-size:12px; color:#cbd5e1; margin-left:4px">מקטע</span><span class="segment-badge">' + seg.segment + '</span>';
+            th.innerHTML = '<span style="font-size:12px; color:#cbd5e1; margin-left:4px">' + (DATA.strings.segment ?? 'מקטע') + '</span><span class="segment-badge">' + seg.segment + '</span>';
             hRow.appendChild(th);
         });
         thead.appendChild(hRow); table.appendChild(thead);
@@ -858,7 +881,7 @@ function renderVizContainer() {
         const headerRow = document.createElement('div'); headerRow.className = 'viz-headers-row';
         segments.forEach(seg => {
             const el = document.createElement('div'); el.className = 'viz-header-item';
-            el.innerHTML = 'מקטע <span class="segment-badge">' + seg.segment + '</span>';
+            el.innerHTML = (DATA.strings.segment ?? 'מקטע') + ' <span class="segment-badge">' + seg.segment + '</span>';
             headerRow.appendChild(el);
         });
         container.appendChild(headerRow);
@@ -914,7 +937,7 @@ function renderVizContainer() {
 
              const badge = document.createElement('div');
              badge.className = 'radar-badge-corner';
-             badge.innerHTML = 'מקטע <span class="segment-badge">' + seg.segment + '</span>';
+             badge.innerHTML = (DATA.strings.segment ?? 'מקטע') + ' <span class="segment-badge">' + seg.segment + '</span>';
              chartDiv.appendChild(badge);
 
              const size = 260; 
@@ -1052,7 +1075,7 @@ function renderGantt() {
     // add unit label to axis (minutes) without affecting layout - place it fixed at viewport right
     const unit = document.createElement('div');
     unit.className = 'gAxisUnitLabel';
-    unit.textContent = 'דקות';
+    unit.textContent = DATA.strings.minutes ?? 'דקות';
     // place at viewport far-right; we'll compute vertical position to align with axis
     unit.style.position = 'fixed';
     unit.style.right = '30px';
@@ -1075,7 +1098,7 @@ function renderGantt() {
         const row = document.createElement('div');
         row.className = 'ganttRow' + (rid === picked ? ' active' : '');
         row.onclick = () => { picked=rid; selectRoute(rid); };
-        const lbl = document.createElement('div'); lbl.className = 'gLabel'; lbl.textContent = 'מסלול ' + heb(rid);
+        const lbl = document.createElement('div'); lbl.className = 'gLabel'; lbl.textContent = (DATA.strings.route ?? 'מסלול') + ' ' + routeLabel(rid);
         const trk = document.createElement('div'); trk.className = 'gTrackContainer';
         const bar = document.createElement('div'); bar.className = 'gBar'; bar.style.width = (total / maxT * 100) + '%';
         segs.forEach(s => {
@@ -1090,15 +1113,12 @@ function renderGantt() {
 
 function selectRoute(id) {
     picked = id;
-    const routeName = 'מסלול ' + heb(id);
-    
-    // השורה הבאה נמחקה כי היא גרמה לשגיאה שמנעה את רינדור הגאנט והויזואליזציה
-    // els.pickedDisplay.textContent = routeName;
-    
+    const routeName = (DATA.strings.route ?? 'מסלול') + ' ' + routeLabel(id);
+
     // עדכון הכפתור שיהיה ברור מה מאשרים
     const submitBtn = document.getElementById('submitBtn');
     if (submitBtn) {
-        submitBtn.textContent = 'אישור בחירה - ' + routeName;
+        submitBtn.textContent = (DATA.strings.confirm ?? 'אישור בחירה') + ' - ' + routeName;
     }
 
     renderVizContainer();
@@ -1172,7 +1192,10 @@ function updateTransform(){
 }
 
 document.getElementById('submitBtn').onclick = () => {
-    els.confirmText.textContent = 'בחרת במסלול '+heb(picked)+'. האם אתה בטוח?';
+    const q = DATA.strings.confirmQuestion ?? 'בחרת במסלול {letter}. האם אתה בטוח?';
+    els.confirmText.textContent = q.replace('{letter}', routeLabel(picked));
+    const isOffRec = picked !== DATA.recommendedRoute;
+    document.getElementById('confirmWarning').style.display = isOffRec ? 'block' : 'none';
     document.getElementById('confirmModal').classList.add('show');
 };
 document.getElementById('cancelConfirm').onclick = () => document.getElementById('confirmModal').classList.remove('show');
@@ -1184,7 +1207,7 @@ els.filterBtn.onclick = () => {
     const hasActive = Object.values(filters).some(x=>!x);
     els.filterBtn.classList.toggle('has-active', hasActive);
     
-    [{k:'routes',l:'מסלולים'},{k:'traffic',l:'עומס'},{k:'toll',l:'אגרה'},{k:'comm',l:'תקשורת'}/*,{k:'parks',l:'פארקים'}*/].forEach(it=>{
+    [{k:'routes',l:DATA.strings.filterRoutes??'מסלולים'},{k:'traffic',l:DATA.strings.traffic??'עומס'},{k:'toll',l:DATA.strings.toll??'אגרה'},{k:'comm',l:DATA.strings.comm??'תקשורת'}].forEach(it=>{
         const div = document.createElement('div'); div.className='filterRow';
         div.innerHTML = \`<span>\${it.l}</span><button class="eyeBtn\${filters[it.k]?' on':''}" onclick="filters['\${it.k}']=!filters['\${it.k}']; drawMap(); this.classList.toggle('on'); document.getElementById('openFilter').classList.toggle('has-active', Object.values(filters).some(x=>!x))"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>\`;
         els.filterList.appendChild(div);
@@ -3684,7 +3707,14 @@ function VisualizationModal(props: {
     onSelectRoute: (id: BadgeId) => void;
 }) {
     const { open, onClose, routeScores, selectedRoute, onSelectRoute } = props;
+    const { t } = useLanguage();
     const [tab, setTab] = useState<VizTab>("times");
+    const VIZ_CRITERIA_T = useMemo(() => [
+        { key: "speedScore" as const, label: t('planner.viz.speed.label'), color: "#3B82F6" },
+        { key: "economyScore" as const, label: t('planner.viz.economy.label'), color: "#F59E0B" },
+        { key: "scenicScore" as const, label: t('planner.viz.scenic.label'), color: "#A855F7" },
+        { key: "commScore" as const, label: t('planner.viz.comm.label'), color: "#22C55E" },
+    ] as const, [t]);
 
     const byRoute = useMemo(() => {
         const m = new Map<BadgeId, RouteScore>();
@@ -3891,7 +3921,7 @@ function VisualizationModal(props: {
         if (!segs.length) return <Empty />;
 
         const chartH = 240;
-        const maxTotal = VIZ_CRITERIA.length * 100; // additive, each metric is 0..100
+        const maxTotal = VIZ_CRITERIA_T.length * 100; // additive, each metric is 0..100
 
         return (
             <Card title="גרף עמודות" subtitle="גרף עמודות נערמות (נערם מתווסף, לא נירמול ל־100%).">
@@ -3912,7 +3942,7 @@ function VisualizationModal(props: {
                                                 background: "rgba(0,0,0,0.10)",
                                             }}
                                         >
-                                            {VIZ_CRITERIA.map((c) => {
+                                            {VIZ_CRITERIA_T.map((c) => {
                                                 const v = Math.max(0, Math.min(100, Number((s as any)[c.key] ?? 0)));
                                                 const h = (v / maxTotal) * chartH;
                                                 const bottom = cumH;
@@ -3994,12 +4024,12 @@ function VisualizationModal(props: {
         const rMax = 86;
 
         const pointAt = (i: number, frac: number) => {
-            const ang = -Math.PI / 2 + (i * 2 * Math.PI) / VIZ_CRITERIA.length;
+            const ang = -Math.PI / 2 + (i * 2 * Math.PI) / VIZ_CRITERIA_T.length;
             return { x: cx + Math.cos(ang) * rMax * frac, y: cy + Math.sin(ang) * rMax * frac };
         };
 
         const polyPoints = (s: SegmentScore) => {
-            return VIZ_CRITERIA.map((ax, i) => {
+            return VIZ_CRITERIA_T.map((ax, i) => {
                 const v = clamp01(Number((s as any)[ax.key] ?? 0) / 100);
                 const p = pointAt(i, v);
                 return `${p.x},${p.y}`;
@@ -4040,7 +4070,7 @@ function VisualizationModal(props: {
                                             strokeWidth={k === 1 ? 1.6 : 1}
                                         />
                                     ))}
-                                    {VIZ_CRITERIA.map((ax, i) => {
+                                    {VIZ_CRITERIA_T.map((ax, i) => {
                                         const p = pointAt(i, 1);
                                         return <line key={ax.key} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(255,255,255,0.20)" />;
                                     })}
@@ -4054,7 +4084,7 @@ function VisualizationModal(props: {
                                     />
 
                                     {/* category labels: colored background + score */}
-                                    {VIZ_CRITERIA.map((ax, i) => {
+                                    {VIZ_CRITERIA_T.map((ax, i) => {
                                         const p = pointAt(i, 1.18);
                                         const val = Math.round(Number((s as any)[ax.key] ?? 0));
                                         const bg = ax.color;
@@ -4139,7 +4169,7 @@ function VisualizationModal(props: {
                                     <th style={{ textAlign: "right", fontSize: 12, opacity: 0.9, padding: 2, width: 78 }}>
                                         מקטע
                                     </th>
-                                    {VIZ_CRITERIA.map((m) => (
+                                    {VIZ_CRITERIA_T.map((m) => (
                                         <th key={m.key} style={{ textAlign: "center", fontSize: 12, padding: 2, width: colW }}>
                                             <div
                                                 style={{
@@ -4173,7 +4203,7 @@ function VisualizationModal(props: {
                                             </div>
                                         </td>
 
-                                        {VIZ_CRITERIA.map((m) => {
+                                        {VIZ_CRITERIA_T.map((m) => {
                                             const val = Math.round(Number((s as any)[m.key] ?? 0));
                                             return (
                                                 <td key={m.key} style={{ padding: 2, width: colW }}>
@@ -4337,15 +4367,18 @@ function createWideBadge(width: 120, height: 20): ImageData {
 
 
 function SegmentLabel({ n }: { n: number }) {
+    const { t } = useLanguage();
     return (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 7, justifyContent: "center" }}>
-            <span style={{ fontWeight: 900, opacity: 0.9 }}>מקטע</span>
+            <span style={{ fontWeight: 900, opacity: 0.9 }}>{t('planner.viz.segment')}</span>
             <SegmentCircle n={n} />
         </div>
     );
 }
 // ▲▲▲ סוף הקוד לראש הקובץ ▲▲▲
 export default function App() {
+    const { lang: uiLang, dir, t } = useLanguage();
+    const isRtl = dir === 'rtl';
     const mapDivRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<maplibregl.Map | null>(null);
     // --- משתני State חדשים לייצוא ---
@@ -4371,6 +4404,54 @@ export default function App() {
 
     // base map controls
     const [lang, setLang] = useState<Lang>("he");
+
+    // Auto-sync map language with UI language
+    useEffect(() => {
+        setLang(uiLang === 'he' ? 'he' : 'en');
+    }, [uiLang]);
+
+    // Build exported HTML strings from current translations
+    const exportedStrings = useMemo(() => ({
+        mapLegend: t('exported.mapLegend'),
+        route: t('exported.route'),
+        selectedRoute: t('exported.selectedRoute'),
+        traffic: t('exported.traffic'),
+        toll: t('exported.toll'),
+        comm: t('exported.comm'),
+        park: t('exported.park'),
+        task: t('exported.task'),
+        taskInstruction: t('exported.taskInstruction'),
+        selectTip: t('exported.selectTip'),
+        estimatedTime: t('exported.estimatedTime'),
+        recommendation: t('exported.recommendation'),
+        confirm: t('exported.confirm'),
+        filterTitle: t('exported.filterTitle'),
+        showAll: t('exported.showAll'),
+        hideAll: t('exported.hideAll'),
+        close: t('exported.close'),
+        confirmTitle: t('exported.confirmTitle'),
+        confirmQuestion: t('exported.confirmQuestion'),
+        confirmWarning: t('exported.confirmWarning'),
+        confirmYes: t('exported.confirmYes'),
+        confirmCancel: t('exported.confirmCancel'),
+        filterRoutes: t('exported.filterRoutes'),
+        zoomIn: t('exported.zoomIn'),
+        centerMap: t('exported.centerMap'),
+        zoomOut: t('exported.zoomOut'),
+        layers: t('exported.layers'),
+        origin: t('exported.origin'),
+        destination: t('exported.destination'),
+        noData: t('exported.noData'),
+        segment: t('exported.segment'),
+        minutes: t('exported.minutes'),
+        vizLegend: t('exported.vizLegend'),
+        segmentTimes: t('exported.segmentTimes'),
+        speed: { label: t('exported.speed.label'), desc: t('exported.speed.desc') },
+        economy: { label: t('exported.economy.label'), desc: t('exported.economy.desc') },
+        scenic: { label: t('exported.scenic.label'), desc: t('exported.scenic.desc') },
+        commScore: { label: t('exported.commScore.label'), desc: t('exported.commScore.desc') },
+    }), [uiLang, t]);
+
     const originalTextFieldRef = useRef<Record<string, any>>({});
     const [showRoads, setShowRoads] = useState(true);
     const [showTransit, setShowTransit] = useState(true);
@@ -7342,6 +7423,9 @@ export default function App() {
                 catTollSegs: currentToll,
                 catTollLabels,
                 catCommZones: currentComm,
+                lang: uiLang,
+                dir,
+                strings: exportedStrings,
             });
 
             try {
@@ -7551,7 +7635,7 @@ export default function App() {
                         textAlign: "right", // ✅ יישור לימין
                     }}
                 >
-                    <div style={{ fontWeight: 900, marginBottom: 8, opacity: 0.95 }}>מקרא</div>
+                    <div style={{ fontWeight: 900, marginBottom: 8, opacity: 0.95 }}>{t('planner.legend.title')}</div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
                         <div
@@ -7562,7 +7646,7 @@ export default function App() {
                                 filter: "drop-shadow(0 0 2px rgba(255,0,34,0.55))",
                             }}
                         />
-                        <div style={{ fontWeight: 700 }}>עומס תנועה</div>
+                        <div style={{ fontWeight: 700 }}>{t('planner.legend.traffic')}</div>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
@@ -7571,7 +7655,7 @@ export default function App() {
                             <div style={{ position: "absolute", left: 0, right: 0, bottom: 1, borderTop: `3px solid ${CAT_TOLL_COLOR}` }} />
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ fontWeight: 700 }}>כביש אגרה</span>
+                            <span style={{ fontWeight: 700 }}>{t('planner.legend.toll')}</span>
                             <span
                                 style={{
                                     display: "inline-flex",
@@ -7601,7 +7685,7 @@ export default function App() {
                                 border: `2px solid ${CAT_COMM_OUTLINE}`,
                             }}
                         />
-                        <div style={{ fontWeight: 700 }}>תקשורת טובה</div>
+                        <div style={{ fontWeight: 700 }}>{t('planner.legend.comm')}</div>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -7615,7 +7699,7 @@ export default function App() {
                                 opacity: PARK_OPACITY,
                             }}
                         />
-                        <div style={{ fontWeight: 700 }}>נוף (פארקים)</div>
+                        <div style={{ fontWeight: 700 }}>{t('planner.legend.scenic')}</div>
                     </div>
                 </div>
 
@@ -7658,7 +7742,7 @@ export default function App() {
                                     background: "rgba(10, 14, 22, 0.98)",
                                 }}
                             >
-                                <div style={{ fontWeight: 900, fontSize: 16 }}>תוצאות</div>
+                                <div style={{ fontWeight: 900, fontSize: 16 }}>{t('planner.results.title')}</div>
 
                                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                                     <button
@@ -7676,7 +7760,7 @@ export default function App() {
                                             fontWeight: 900,
                                         }}
                                     >
-                                        ייצא CSV
+                                        {t('planner.results.exportCsv')}
                                     </button>
 
                                     <button
@@ -7691,7 +7775,7 @@ export default function App() {
                                             fontWeight: 900,
                                         }}
                                     >
-                                        סגור
+                                        {t('planner.results.close')}
                                     </button>
                                 </div>
                             </div>
@@ -7805,15 +7889,15 @@ export default function App() {
                                             </colgroup>
                                             <thead>
                                                 <tr style={{ background: "rgba(255,255,255,0.04)" }}>
-                                                    <th style={thBase}>מקטע</th>
-                                                    <th style={thBase}>אורך (ק״מ)</th>
-                                                    <th style={thBase}>זמן (דק׳)</th>
-                                                    <th style={{ ...thBase, ...dividerL, background: "rgba(59,130,246,0.10)" }}>מהירות</th>
-                                                    <th style={{ ...thBase, background: "rgba(245,158,11,0.10)" }}>חסכון</th>
-                                                    <th style={{ ...thBase, background: "rgba(34,197,94,0.10)" }}>נוף</th>
-                                                    <th style={{ ...thBase, background: "rgba(170,60,255,0.10)" }}>קליטה</th>
-                                                    <th style={{ ...thBase, ...dividerL }}>משקולת</th>
-                                                    <th style={thBase}>שיקלול</th>
+                                                    <th style={thBase}>{t('planner.results.segment')}</th>
+                                                    <th style={thBase}>{t('planner.results.length')}</th>
+                                                    <th style={thBase}>{t('planner.results.time')}</th>
+                                                    <th style={{ ...thBase, ...dividerL, background: "rgba(59,130,246,0.10)" }}>{t('planner.results.speed')}</th>
+                                                    <th style={{ ...thBase, background: "rgba(245,158,11,0.10)" }}>{t('planner.results.economy')}</th>
+                                                    <th style={{ ...thBase, background: "rgba(34,197,94,0.10)" }}>{t('planner.results.scenic')}</th>
+                                                    <th style={{ ...thBase, background: "rgba(170,60,255,0.10)" }}>{t('planner.results.reception')}</th>
+                                                    <th style={{ ...thBase, ...dividerL }}>{t('planner.results.weight')}</th>
+                                                    <th style={thBase}>{t('planner.results.weighted')}</th>
                                                 </tr>
                                             </thead>
 
@@ -7830,13 +7914,13 @@ export default function App() {
                                                                     background: "rgba(255,255,255,0.03)",
                                                                 }}
                                                             >
-                                                                מסלול {rs.route}
+                                                                {t('planner.results.route')} {rs.route}
                                                             </td>
                                                         </tr>
 
                                                         {(rs.segments || []).map((sg: any) => (
                                                             <tr key={`${rs.route}-${sg.segment}`}>
-                                                                <td style={tdBase}>מקטע {sg.segment}</td>
+                                                                <td style={tdBase}>{t('planner.results.segment')} {sg.segment}</td>
                                                                 <td style={tdBase}>{km(Number(sg.lengthM ?? 0))}</td>
                                                                 <td style={tdBase}>{mins(Number(sg.timeS ?? 0))}</td>
                                                                 <td style={{ ...tdBase, ...dividerL }}>{sc(Number(sg.speedScore ?? 0))}</td>
@@ -7849,7 +7933,7 @@ export default function App() {
                                                         ))}
 
                                                         <tr style={{ background: "rgba(255,255,255,0.05)" }}>
-                                                            <td style={{ ...tdBase, fontWeight: 900 }}>סה״כ</td>
+                                                            <td style={{ ...tdBase, fontWeight: 900 }}>{t('planner.results.total')}</td>
                                                             <td style={{ ...tdBase, fontWeight: 900 }}>{km(Number(rs.totalLengthM ?? 0))}</td>
                                                             <td style={{ ...tdBase, fontWeight: 900 }}>{mins(Number(rs.totalTimeS ?? 0))}</td>
                                                             <td style={{ ...tdBase, ...dividerL, fontWeight: 900 }}>—</td>
@@ -7879,16 +7963,17 @@ export default function App() {
                     background: "#0b0f17",
                     color: "#e8eefc",
                     padding: 16,
-                    borderLeft: "1px solid rgba(255,255,255,0.08)",
+                    borderLeft: isRtl ? "1px solid rgba(255,255,255,0.08)" : undefined,
+                    borderRight: isRtl ? undefined : "1px solid rgba(255,255,255,0.08)",
                     fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
-                    direction: "rtl",
+                    direction: dir,
                     overflowY: "auto",
                 }}
             >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     {/* --- התחלת הבלוק החדש: כפתורי ניהול (JSON + טעינה) --- */}
                     <div style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "center" }}>
-                    <div style={{ fontWeight: 900, fontSize: 22, marginRight: 10, fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif"}}>תכנון תרחיש</div>            
+                    <div style={{ fontWeight: 900, fontSize: 22, marginRight: 10, fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif"}}>{t('planner.panel.title')}</div>
    
                         {/* 1. כפתור JSON (החדש) */}
                         <button
@@ -7933,7 +8018,7 @@ export default function App() {
                             }}
                         >
                             <span style={{ marginLeft: 6 }}>📂</span>
-                            טעינת תרחיש
+                            {t('planner.panel.loadScenario')}
                             <input
                                         type="file"
                                         accept=".json"
@@ -7955,10 +8040,10 @@ export default function App() {
                 </div>
                 {/* Map data row */}
                 <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                    <div style={{ fontWeight: 900, marginBottom: 10 }}>נתוני מפה</div>
+                    <div style={{ fontWeight: 900, marginBottom: 10 }}>{t('planner.mapData.title')}</div>
                     {/* --- התחלת הקוד החדש --- */}
                     <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontWeight: 800, marginBottom: 6 }}>סגנון מפה</div>
+                        <div style={{ fontWeight: 800, marginBottom: 6 }}>{t('planner.mapData.mapStyle')}</div>
                         <div style={{ display: "flex", background: "rgba(0,0,0,0.3)", borderRadius: 8, padding: 4 }}>
                             <button
                                 onClick={() => setMapStyleType('vector')}
@@ -7969,7 +8054,7 @@ export default function App() {
                                     fontWeight: 900
                                 }}
                             >
-                                רגיל
+                                {t('planner.mapData.regular')}
                             </button>
                             <button
                                 onClick={() => setMapStyleType('satellite')}
@@ -7980,13 +8065,13 @@ export default function App() {
                                     fontWeight: 900
                                 }}
                             >
-                                לוויין
+                                {t('planner.mapData.satellite')}
                             </button>
                         </div>
                     </div>
                     <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 800, marginBottom: 6 }}>שפה במפה</div>
+                            <div style={{ fontWeight: 800, marginBottom: 6 }}>{t('planner.mapData.mapLanguage')}</div>
                             <select
                                 value={lang}
                                 onChange={(e) => setLang(e.target.value as Lang)}
@@ -8024,7 +8109,7 @@ export default function App() {
                             }}
                             title={layerFilterActive ? "יש שכבות/קטגוריות מוסתרות" : "כל השכבות מוצגות"}
                         >
-                            ניהול שכבות
+                            {t('planner.mapData.layerManager')}
                             {layerFilterActive && <span style={{ width: 10, height: 10, borderRadius: 999, background: "#F59E0B", display: "inline-block" }} />}
                         </button>
                     </div>
@@ -8066,7 +8151,7 @@ export default function App() {
                             onMouseDown={(e) => e.stopPropagation()}
                         >
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
-                                <div style={{ fontWeight: 900, fontSize: 16 }}>ניהול שכבות</div>
+                                <div style={{ fontWeight: 900, fontSize: 16 }}>{t('planner.mapData.layerManager')}</div>
                                 <button
                                     onClick={() => setShowLayerManager(false)}
                                     style={{
@@ -8087,10 +8172,10 @@ export default function App() {
                             <div style={{ fontWeight: 900, marginBottom: 8 }}>שכבות בסיס</div>
                             <div style={{ display: "grid", gap: 8 }}>
                                 {[
-                                    { key: "roads", label: "כבישים", v: showRoads, set: setShowRoads },
-                                    { key: "transit", label: "תחבורה", v: showTransit, set: setShowTransit },
-                                    { key: "labels", label: "תוויות", v: showLabels, set: setShowLabels },
-                                    { key: "poi", label: "נקודות עניין", v: showPOI, set: setShowPOI },
+                                    { key: "roads", label: t('planner.mapData.roads'), v: showRoads, set: setShowRoads },
+                                    { key: "transit", label: t('planner.mapData.transit'), v: showTransit, set: setShowTransit },
+                                    { key: "labels", label: t('planner.mapData.labels'), v: showLabels, set: setShowLabels },
+                                    { key: "poi", label: t('planner.mapData.poi'), v: showPOI, set: setShowPOI },
                                 ].map((it) => (
                                     <label key={it.key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                                         <input type="checkbox" checked={it.v} onChange={(e) => it.set(e.target.checked)} />
@@ -8107,11 +8192,11 @@ export default function App() {
 
                                 <div style={{ display: "grid", gap: 8 }}>
                                     {[
-                                        { key: "traffic", label: "עומס תנועה", v: showCatTraffic, set: setShowCatTraffic, disabled: !tripleComputed },
-                                        { key: "toll", label: "כבישי אגרה", v: showCatToll, set: setShowCatToll, disabled: !tripleComputed },
-                                        { key: "comm", label: "תקשורת טובה", v: showCatComm, set: setShowCatComm, disabled: !tripleComputed },
-                                        { key: "baseParks", label: "פארקים במפה", v: showBaseParks, set: setShowBaseParks, disabled: false },
-                                        { key: "manualParks", label: "פארקים ידניים", v: showManualParks, set: setShowManualParks, disabled: false },
+                                        { key: "traffic", label: t('planner.mapData.trafficLayer'), v: showCatTraffic, set: setShowCatTraffic, disabled: !tripleComputed },
+                                        { key: "toll", label: t('planner.mapData.tollRoads'), v: showCatToll, set: setShowCatToll, disabled: !tripleComputed },
+                                        { key: "comm", label: t('planner.mapData.goodComms'), v: showCatComm, set: setShowCatComm, disabled: !tripleComputed },
+                                        { key: "baseParks", label: t('planner.mapData.baseParks'), v: showBaseParks, set: setShowBaseParks, disabled: false },
+                                        { key: "manualParks", label: t('planner.mapData.manualParks'), v: showManualParks, set: setShowManualParks, disabled: false },
                                     ].map((it) => (
                                         <label
                                             key={it.key}
@@ -8127,7 +8212,7 @@ export default function App() {
                     </div>
                 )}
                 <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                    <div style={{ fontWeight: 900, marginBottom: 10 }}> בחר פעולה</div>
+                    <div style={{ fontWeight: 900, marginBottom: 10 }}>{t('planner.mode.title')}</div>
 
                     {/* טוגל כפתורים */}
                     <div style={{
@@ -8139,9 +8224,9 @@ export default function App() {
                         margin: "0 auto 12px auto"
                     }}>
                         {[
-                            { id: "TRIPLE" as const, label: "3 מסלולים" },
-                            { id: "SINGLE" as const, label: "מסלול יחיד" },
-                            { id: "MEASURE" as const, label: "מדידה" },
+                            { id: "TRIPLE" as const, label: t('planner.mode.triple') },
+                            { id: "SINGLE" as const, label: t('planner.mode.single') },
+                            { id: "MEASURE" as const, label: t('planner.mode.measure') },
                         ].map((b) => {
                             const isActive = b.id === "TRIPLE" ? mode === "TRIPLE" : mode === b.id;
                             const isArmed = b.id === "TRIPLE" && triplePickArmed;
@@ -8203,9 +8288,9 @@ export default function App() {
                     <>
 
                         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                            <div style={{ fontWeight: 900, marginBottom: 6 }}>שלב 1: פרמטרים וחישוב</div>
+                            <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.triple.step1')}</div>
 
-                            <div style={{ fontWeight: 800, marginBottom: 8 }}>שונות</div>
+                            <div style={{ fontWeight: 800, marginBottom: 8 }}>{t('planner.triple.diversity')}</div>
                             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                                 <input
                                     type="range"
@@ -8254,9 +8339,9 @@ export default function App() {
                                         fontWeight: 900,
                                         opacity: isRoutingTriple ? 0.75 : 1,
                                     }}
-                                    title={!canTriple ? "בחר מוצא ויעד כדי לאפשר חישוב" : "חשב מסלולים"}
+                                    title={!canTriple ? "בחר מוצא ויעד כדי לאפשר חישוב" : t('planner.actions.calculate')}
                                 >
-                                    {isRoutingTriple ? "מחשב…" : "חישוב"}
+                                    {isRoutingTriple ? t('planner.actions.calculating') : t('planner.actions.calculate')}
                                 </button>
 
                                 <button
@@ -8271,7 +8356,7 @@ export default function App() {
                                         cursor: "pointer",
                                         fontWeight: 900,
                                     }}
-                                    title="נקה את כל המסלולים/מדידה"
+                                    title={t('planner.actions.clearAll')}
                                 >
                                     ניקוי 🗑️
                                 </button>
@@ -8286,12 +8371,12 @@ export default function App() {
                             <div style={{ fontWeight: 900, marginBottom: 6 }}>שלב 2: בחירת מסלול</div>
                             <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>חלוקת מקטעים (1/2/3 + טיקים) מוצגת רק למסלול שנבחר.</div>
 
-                            <div style={{ fontWeight: 800, marginBottom: 8 }}>מסלול נבחר</div>
+                            <div style={{ fontWeight: 800, marginBottom: 8 }}>{t('planner.triple.selectRoute')}</div>
                             <div style={{ display: "flex", gap: 10, marginBottom: 4 }}>
                                 {[
-                                    { id: "A" as const, label: "מסלול א" },
-                                    { id: "B" as const, label: "מסלול ב" },
-                                    { id: "C" as const, label: "מסלול ג" },
+                                    { id: "A" as const, label: t('planner.triple.routeA') },
+                                    { id: "B" as const, label: t('planner.triple.routeB') },
+                                    { id: "C" as const, label: t('planner.triple.routeC') },
                                 ].map((r) => (
                                     <button
                                         key={r.id}
@@ -8342,7 +8427,7 @@ export default function App() {
                                     }}
                                     title="מצב עריכה: לחץ על עיגולים במסלול כדי למחוק/להחזיר צמתים"
                                 >
-                                    {isEditMode ? "סיום עריכה" : "עריכת מסלול"}
+                                    {isEditMode ? t('planner.triple.endEdit') : t('planner.triple.editRoute')}
                                 </button>
 
                                 <button
@@ -8429,10 +8514,10 @@ export default function App() {
                             {/* רשימת הקטגוריות - מעודכן עם אייקון כביש אגרה כפול */}
                             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                                 {[
-                                    { key: "traffic", title: "עומס תנועה" },
-                                    { key: "toll", title: "כבישי אגרה" },
-                                    { key: "comm", title: "תקשורת" },
-                                    { key: "park", title: "פארקים" },
+                                    { key: "traffic", title: t('planner.categories.traffic') },
+                                    { key: "toll", title: t('planner.categories.toll') },
+                                    { key: "comm", title: t('planner.categories.comm') },
+                                    { key: "park", title: t('planner.categories.parks') },
                                 ].map((c, idx, arr) => (
                                     <div
                                         key={c.key}
@@ -8530,7 +8615,7 @@ export default function App() {
                                                     cursor: "pointer",
                                                 }}
                                             >
-                                                {(c.key === "park" && isDrawingPark) ? "סיים" : "הוסף"}
+                                                {(c.key === "park" && isDrawingPark) ? t('planner.categories.finish') : t('planner.categories.add')}
                                             </button>
 
                                             {/* כפתור דגירה - רק לפארקים */}
@@ -8556,7 +8641,7 @@ export default function App() {
                                                     }}
                                                     title="סמן פארק קיים מהמפה והפוך אותו לידני"
                                                 >
-                                                    {isPickingPark ? "בטל" : "דגירה"}
+                                                    {isPickingPark ? t('planner.categories.cancel') : t('planner.categories.pick')}
                                                 </button>
                                             )}
 
@@ -8566,7 +8651,7 @@ export default function App() {
                                                     setDraftEntityPts([]);
                                                     setDraftCommCenter(null);
                                                     setIsDrawingPark(false);
-                                                    setIsPickingPark(false); 
+                                                    setIsPickingPark(false);
                                                     setDeleteCatMode((prev) => (prev === (c.key as any) ? null : (c.key as any)));
                                                     showToast("מצב מחיקה: לחץ על ישות במפה.");
                                                 }}
@@ -8584,7 +8669,7 @@ export default function App() {
                                                     cursor: "pointer",
                                                 }}
                                             >
-                                                {deleteCatMode === (c.key as any) ? "פעיל" : "מחק"}
+                                                {deleteCatMode === (c.key as any) ? t('planner.categories.active') : t('planner.categories.delete')}
                                             </button>
                                         </div>
                                     </div>
@@ -8978,7 +9063,7 @@ export default function App() {
                                             transition: "all 0.2s"
                                         }}
                                     >
-                                        {showResults ? "הסתר נתונים" : "הצג תוצאות"}
+                                        {showResults ? t('planner.actions.hideData') : t('planner.actions.showResults')}
                                     </button>
 
                                     {/* כפתור 2: רק פותח את המודל הגרפי */}
@@ -9271,7 +9356,7 @@ export default function App() {
 
                 {/* Export participant screen */}
                 <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                    <div style={{ fontWeight: 900, marginBottom: 6 }}>ייצוא נתונים</div>
+                    <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.export.title')}</div>
                     <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10, lineHeight: 1.45 }}>
                         יצירת קובץ <b>HTML</b> עצמאי להצגת התרחיש לנבדק (מפה + בחירת מסלול + פירוט מקטעים).
                     </div>
@@ -9295,7 +9380,7 @@ export default function App() {
                             fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
                         }}
                     >
-                        פתיחת חלון ייצוא
+                        {t('planner.export.openWindow')}
                     </button>
 
                     {exportLastSaved && (
@@ -9348,13 +9433,13 @@ export default function App() {
                                         fontWeight: 900,
                                     }}
                                 >
-                                    סגור
+                                    {t('planner.results.close')}
                                 </button>
                             </div>
 
                             <div style={{ display: "grid", gap: 12 }}>
                                 <div>
-                                    <div style={{ fontWeight: 800, marginBottom: 6 }}>שם תרחיש</div>
+                                    <div style={{ fontWeight: 800, marginBottom: 6 }}>{t('planner.export.scenarioName')}</div>
                                     <input
                                         maxLength={120}
                                         value={exportScenarioName}
@@ -9376,7 +9461,7 @@ export default function App() {
                                 </div>
 
                                 <div>
-                                    <div style={{ fontWeight: 800, marginBottom: 6 }}>טקסט מטלה</div>
+                                    <div style={{ fontWeight: 800, marginBottom: 6 }}>{t('planner.export.taskText')}</div>
                                     <textarea
                                         maxLength={1200}
                                         value={exportTaskText}
@@ -9398,7 +9483,7 @@ export default function App() {
                                 </div>
 
                                 <div>
-                                    <div style={{ fontWeight: 800, marginBottom: 6 }}>דרישות (טקסט חופשי)</div>
+                                    <div style={{ fontWeight: 800, marginBottom: 6 }}>{t('planner.export.requirements')}</div>
                                     <textarea
                                         maxLength={1200}
                                         value={exportRequirementsText}
@@ -9424,7 +9509,7 @@ export default function App() {
                                     {/* --- בחירת סוגי ויזואליזציה (Checkboxes) --- */}
                                     <div style={{ marginBottom: 16 }}>
                                         <label style={{ display: "block", marginBottom: 8, fontSize: 14, fontWeight: 600 }}>
-                                            סוגי ויזואליזציה לייצוא:
+                                            {t('planner.export.vizTypes')}
                                         </label>
                                         <div style={{ 
                                             display: "flex", 
@@ -9445,7 +9530,7 @@ export default function App() {
                                                     }}
                                                     style={{ marginLeft: 8 }}
                                                 />
-                                                בחר הכל (All)
+                                                {t('planner.export.selectAll')}
                                             </label>
 
                                             {/* Stacked */}
@@ -9484,7 +9569,7 @@ export default function App() {
                                     </div>
 
                                     <div style={{ flex: 1, minWidth: 220 }}>
-                                        <div style={{ fontWeight: 800, marginBottom: 6 }}>מסלול מומלץ</div>
+                                        <div style={{ fontWeight: 800, marginBottom: 6 }}>{t('planner.export.recommendedRoute')}</div>
                                         <select
                                             value={exportRecommendedRoute}
                                             onChange={(e) => setExportRecommendedRoute(e.target.value as "A" | "B" | "C")}
@@ -9508,7 +9593,7 @@ export default function App() {
                                 </div>
 
                                 <div>
-                                    <div style={{ fontWeight: 800, marginBottom: 6 }}>נתיב שמירה</div>
+                                    <div style={{ fontWeight: 800, marginBottom: 6 }}>{t('planner.export.savePath')}</div>
                                     <div
                                         style={{
                                             display: "grid",

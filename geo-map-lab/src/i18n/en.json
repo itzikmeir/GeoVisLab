@@ -1,0 +1,261 @@
+{
+  "_note": "Strings marked [??] are uncertain translations. Search for [??] to find and edit them.",
+  "dir": "ltr",
+  "lang": "en",
+  "app": {
+    "title": "GeoVisLab"
+  },
+  "menu": {
+    "navTitle": "Main Navigation",
+    "scenarios": "🛠️ Scenario Planning",
+    "manageExports": "📂 Manage Exported Files",
+    "batchGenerator": "🏭 Batch Generator (JSON to HTML)",
+    "help": "❓ Help / Guide",
+    "about": "ℹ️ About",
+    "langSwitch": {
+      "title": "⚙️ Interface Language",
+      "he": "עברית",
+      "en": "English"
+    },
+    "aboutContent": {
+      "coreEngine": "Core Engine: v1.0.2",
+      "plannerModule": "Planner Module: v1.2.0",
+      "react": "React: v19",
+      "academic": "Developed for Academic Research",
+      "rights": "© 2026 All Rights Reserved"
+    }
+  },
+  "planner": {
+    "panel": {
+      "title": "Scenario Planning",
+      "jsonExport": "JSON ⇩",
+      "loadScenario": "📂 Load Scenario",
+      "lastSaved": "Last saved:"
+    },
+    "mapData": {
+      "title": "Map Data",
+      "mapStyle": "Map Style",
+      "regular": "Regular",
+      "satellite": "Satellite",
+      "mapLanguage": "Map Language",
+      "langHe": "עברית",
+      "langEn": "English",
+      "layerManager": "Layer Manager",
+      "roads": "Roads",
+      "transit": "Transit",
+      "labels": "Labels",
+      "poi": "Points of Interest",
+      "trafficLayer": "[??] Traffic",
+      "tollRoads": "Toll Roads",
+      "goodComms": "[??] Good Coverage",
+      "baseParks": "Base Parks",
+      "manualParks": "Manual Parks"
+    },
+    "mode": {
+      "title": "Select Action",
+      "triple": "3 Routes",
+      "single": "Single Route",
+      "measure": "Measurement",
+      "statusLabel": "Selection Status:",
+      "statusActive": "Active",
+      "statusWaiting": "[??] Waiting",
+      "statusHint": "(1st click = origin, 2nd = destination)"
+    },
+    "triple": {
+      "step1": "Step 1: Parameters & Calculation",
+      "diversity": "[??] Diversity",
+      "targetTimeGap": "Target Time Gap (min)",
+      "selectRoute": "Select Route",
+      "routeA": "Route A",
+      "routeB": "Route B",
+      "routeC": "Route C",
+      "editRoute": "Edit Route",
+      "endEdit": "End Editing",
+      "cancelChanges": "Cancel all changes and revert to system solution",
+      "undo": "Undo",
+      "redo": "Redo"
+    },
+    "categories": {
+      "traffic": "[??] Traffic",
+      "toll": "Toll Roads",
+      "comm": "[??] Coverage",
+      "parks": "Parks",
+      "add": "Add",
+      "finish": "Finish",
+      "pick": "[??] Hatch",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "active": "Active",
+      "keepEntities": "Keep manual entities"
+    },
+    "actions": {
+      "showResults": "Show Results",
+      "hideData": "Hide Data",
+      "calculate": "Calculate Routes",
+      "calculating": "Calculating…",
+      "clearAll": "Clear all routes / measurement"
+    },
+    "results": {
+      "title": "Results",
+      "exportCsv": "Export CSV",
+      "close": "Close",
+      "segment": "Segment",
+      "length": "Length (km)",
+      "time": "Time (min)",
+      "speed": "Speed",
+      "economy": "[??] Savings",
+      "scenic": "[??] Scenic",
+      "reception": "[??] Reception",
+      "weight": "[??] Weight",
+      "weighted": "[??] Weighted Score",
+      "route": "Route",
+      "total": "Total"
+    },
+    "export": {
+      "title": "Export Data",
+      "openWindow": "Open Export Window",
+      "scenarioName": "Scenario Name",
+      "taskText": "Task Text",
+      "requirements": "Requirements (Free Text)",
+      "vizTypes": "Visualization Types for Export:",
+      "selectAll": "Select All",
+      "stacked": "Bar Chart (Stacked) - suffix S",
+      "radar": "Radar Chart (Radar) - suffix R",
+      "heatmap": "Table (Heatmap) - suffix H",
+      "recommendedRoute": "Recommended Route",
+      "savePath": "Save Path",
+      "chooseFolder": "Choose Folder…",
+      "default": "Default",
+      "exportHtml": "Export Screen to Participant (HTML)",
+      "saveJson": "Save Full Scenario (JSON)",
+      "cancel": "Cancel"
+    },
+    "legend": {
+      "title": "Legend",
+      "traffic": "[??] Traffic",
+      "toll": "Toll Road",
+      "comm": "[??] Coverage",
+      "scenic": "[??] Scenic (Parks)"
+    },
+    "viz": {
+      "modal": {
+        "title": "Visualizations",
+        "close": "Close",
+        "tabTimes": "Segment Times",
+        "tabBars": "Bar Chart",
+        "tabRadar": "Radar Chart",
+        "tabHeatmap": "Heatmap"
+      },
+      "cards": {
+        "timesTable": "Times Table",
+        "barChart": "Bar Chart",
+        "radarChart": "Radar Chart",
+        "heatmap": "Heatmap"
+      },
+      "segment": "Segment",
+      "speed": { "label": "Speed", "desc": "[??] Minimal Traffic" },
+      "economy": { "label": "[??] Savings", "desc": "[??] Minimal Toll Roads" },
+      "scenic": { "label": "[??] Scenic", "desc": "[??] Near Parks" },
+      "comm": { "label": "[??] Reception", "desc": "[??] Enhanced Coverage Zones" }
+    }
+  },
+  "exportManager": {
+    "title": "Manage and Update Exported HTML Files",
+    "section1": {
+      "title": "Load Excel File (Data)",
+      "desc": "The system will automatically search for the sheet: \"Scenario Catalog\""
+    },
+    "section2": {
+      "title": "Load HTML Files Folder",
+      "desc": "Select the folder with Exp_SCN...html files",
+      "filesDetected": "✓ Detected {n} files"
+    },
+    "section3": {
+      "title": "Advanced Settings",
+      "cssPlaceholder": "Global CSS styling (optional)...",
+      "inaccurate": "Create version with inaccurate recommendations (REC_INACCURATE)",
+      "timerLabel": "⏳ Time allocated for scenario (seconds):"
+    },
+    "btn": {
+      "run": "🚀 Run Update",
+      "processing": "Processing data..."
+    },
+    "logs": {
+      "title": "System Log:",
+      "empty": "Waiting for action...",
+      "sheetFound": "📄 Found requested sheet: \"{name}\"",
+      "sheetNotFound": "⚠️ Sheet \"{name}\" not found. Using first: \"{first}\"",
+      "sheetEmpty": "⚠️ Sheet is empty.",
+      "columnMissing": "❌ Error: SCN_ID column not found in sheet \"{name}\".",
+      "rowsFailed": "❌ Failed to load valid rows.",
+      "rowsLoaded": "✅ Loaded {count} rows from sheet \"{name}\"",
+      "excelError": "❌ Error loading Excel",
+      "htmlLoaded": "📂 Loaded {count} HTML files",
+      "startProcess": "--- Starting process ---",
+      "processed": "✅ Processed: {name} (ID: {id} -> Rec: {rec})",
+      "notFound": "⚠️ Not found in Excel: {name} (detected ID: {id}) - copied unchanged",
+      "done": "🎉 Done! {count} files processed.",
+      "noChanges": "❌ No changes made."
+    }
+  },
+  "batchGenerator": {
+    "title": "Batch Scenario Generator",
+    "noteLabel": "Note:",
+    "noteDesc": "Ensure that template.html is in the project's public folder.",
+    "folderLabel": "Select folder with JSON files:",
+    "btn": {
+      "generate": "Generate Scenarios and Download ZIP",
+      "processing": "Processing..."
+    },
+    "logs": {
+      "loaded": "Loaded {count} JSON files.",
+      "noFolder": "Please load a folder with JSON files first",
+      "templateNotFound": "template.html not found in public folder",
+      "anchorNotFound": "/* DATA_INJECTION_POINT */ anchor not found in template. Please update template.html",
+      "jsonError": "Error reading JSON in file {name}",
+      "created": "Created: {id} ({name})",
+      "success": "Process completed successfully! File downloaded.",
+      "error": "Error: {msg}"
+    }
+  },
+  "exported": {
+    "mapLegend": "Map Legend",
+    "route": "Route",
+    "selectedRoute": "Selected Route",
+    "traffic": "[??] Traffic",
+    "toll": "Toll",
+    "comm": "[??] Coverage",
+    "park": "Park",
+    "task": "[??] Task",
+    "taskInstruction": "If more than one route meets the requirements, prefer the route with the shortest total travel time.",
+    "selectTip": "💡 You can select a route by clicking the line on the map or in the segment time graph.",
+    "estimatedTime": "Estimated task time:",
+    "recommendation": "System Recommendation",
+    "confirm": "Confirm Selection",
+    "filterTitle": "Layer Filters",
+    "showAll": "Show All",
+    "hideAll": "Hide All",
+    "close": "Close",
+    "confirmTitle": "Confirm Selection",
+    "confirmQuestion": "You selected route {letter}. Are you sure?",
+    "confirmWarning": "Note: You selected a different route than the system's recommendation.",
+    "confirmYes": "Yes, I'm sure",
+    "confirmCancel": "Cancel",
+    "filterRoutes": "Routes",
+    "zoomIn": "Zoom In",
+    "centerMap": "Center Map",
+    "zoomOut": "Zoom Out",
+    "layers": "Layers",
+    "origin": "[??] Origin",
+    "destination": "Destination",
+    "noData": "No Data",
+    "segment": "Segment",
+    "minutes": "min",
+    "vizLegend": "Visualization Legend",
+    "segmentTimes": "Segment Times",
+    "speed": { "label": "Speed", "desc": "[??] Minimal Traffic" },
+    "economy": { "label": "[??] Savings", "desc": "[??] Minimal Toll Roads" },
+    "scenic": { "label": "[??] Scenic", "desc": "[??] Near Parks" },
+    "commScore": { "label": "[??] Reception", "desc": "[??] Enhanced Coverage Zones" }
+  }
+}

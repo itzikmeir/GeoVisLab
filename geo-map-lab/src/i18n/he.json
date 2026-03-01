@@ -1,0 +1,260 @@
+{
+  "dir": "rtl",
+  "lang": "he",
+  "app": {
+    "title": "GeoVisLab"
+  },
+  "menu": {
+    "navTitle": "ניווט ראשי",
+    "scenarios": "🛠️ תכנון תרחישים",
+    "manageExports": "📂 ניהול קבצים מיוצאים",
+    "batchGenerator": "🏭 מחולל המוני (JSON to HTML)",
+    "help": "❓ עזרה / מדריך",
+    "about": "ℹ️ אודות",
+    "langSwitch": {
+      "title": "⚙️ שפת ממשק",
+      "he": "עברית",
+      "en": "English"
+    },
+    "aboutContent": {
+      "coreEngine": "Core Engine: v1.0.2",
+      "plannerModule": "Planner Module: v1.2.0",
+      "react": "React: v19",
+      "academic": "פותח עבור מחקר אקדמי",
+      "rights": "© 2026 כל הזכויות שמורות"
+    }
+  },
+  "planner": {
+    "panel": {
+      "title": "תכנון תרחיש",
+      "jsonExport": "JSON ⇩",
+      "loadScenario": "📂 טעינת תרחיש",
+      "lastSaved": "נשמר לאחרונה:"
+    },
+    "mapData": {
+      "title": "נתוני מפה",
+      "mapStyle": "סגנון מפה",
+      "regular": "רגיל",
+      "satellite": "לוויין",
+      "mapLanguage": "שפה במפה",
+      "langHe": "עברית",
+      "langEn": "English",
+      "layerManager": "ניהול שכבות",
+      "roads": "כבישים",
+      "transit": "תחבורה",
+      "labels": "תוויות",
+      "poi": "נקודות עניין",
+      "trafficLayer": "עומס תנועה",
+      "tollRoads": "כבישי אגרה",
+      "goodComms": "תקשורת טובה",
+      "baseParks": "פארקים במפה",
+      "manualParks": "פארקים ידניים"
+    },
+    "mode": {
+      "title": "בחר פעולה",
+      "triple": "3 מסלולים",
+      "single": "מסלול יחיד",
+      "measure": "מדידה",
+      "statusLabel": "סטטוס בחירה:",
+      "statusActive": "פעיל",
+      "statusWaiting": "ממתין",
+      "statusHint": "(קליק ראשון=מוצא, שני=יעד)"
+    },
+    "triple": {
+      "step1": "שלב 1: פרמטרים וחישוב",
+      "diversity": "שונות",
+      "targetTimeGap": "פער זמן יעד (דק')",
+      "selectRoute": "בחר מסלול",
+      "routeA": "מסלול א",
+      "routeB": "מסלול ב",
+      "routeC": "מסלול ג",
+      "editRoute": "עריכת מסלול",
+      "endEdit": "סיום עריכה",
+      "cancelChanges": "ביטול כל השינויים וחזרה לפתרון המערכת",
+      "undo": "חזור צעד אחורה",
+      "redo": "קדימה (אחרי חזור)"
+    },
+    "categories": {
+      "traffic": "עומס תנועה",
+      "toll": "כבישי אגרה",
+      "comm": "תקשורת",
+      "parks": "פארקים",
+      "add": "הוסף",
+      "finish": "סיים",
+      "pick": "דגירה",
+      "cancel": "בטל",
+      "delete": "מחק",
+      "active": "פעיל",
+      "keepEntities": "שמור ישויות ידניות"
+    },
+    "actions": {
+      "showResults": "הצג תוצאות",
+      "hideData": "הסתר נתונים",
+      "calculate": "חשב מסלולים",
+      "calculating": "מחשב…",
+      "clearAll": "נקה את כל המסלולים/מדידה"
+    },
+    "results": {
+      "title": "תוצאות",
+      "exportCsv": "ייצוג CSV",
+      "close": "סגור",
+      "segment": "מקטע",
+      "length": "אורך (ק״מ)",
+      "time": "זמן (דק׳)",
+      "speed": "מהירות",
+      "economy": "חסכון",
+      "scenic": "נוף",
+      "reception": "קליטה",
+      "weight": "משקולת",
+      "weighted": "שיקלול",
+      "route": "מסלול",
+      "total": "סה״כ"
+    },
+    "export": {
+      "title": "ייצוא נתונים",
+      "openWindow": "פתיחת חלון ייצוא",
+      "scenarioName": "שם תרחיש",
+      "taskText": "טקסט מטלה",
+      "requirements": "דרישות (טקסט חופשי)",
+      "vizTypes": "סוגי ויזואליזציה לייצוא:",
+      "selectAll": "בחר הכל (All)",
+      "stacked": "גרף עמודות (Stacked) - סיומת S",
+      "radar": "גרף רדאר (Radar) - סיומת R",
+      "heatmap": "טבלה (Table) - סיומת H",
+      "recommendedRoute": "מסלול מומלץ",
+      "savePath": "נתיב שמירה",
+      "chooseFolder": "בחר תיקייה…",
+      "default": "ברירת מחדל",
+      "exportHtml": "ייצוא מסך למשתתף (HTML)",
+      "saveJson": "שמור תרחיש מלא (JSON)",
+      "cancel": "ביטול"
+    },
+    "legend": {
+      "title": "מקרא",
+      "traffic": "עומס תנועה",
+      "toll": "כביש אגרה",
+      "comm": "תקשורת טובה",
+      "scenic": "נוף (פארקים)"
+    },
+    "viz": {
+      "modal": {
+        "title": "ויזואליזציות",
+        "close": "סגור",
+        "tabTimes": "זמני מקטעים",
+        "tabBars": "גרף עמודות",
+        "tabRadar": "גרף רדאר",
+        "tabHeatmap": "מפת חום"
+      },
+      "cards": {
+        "timesTable": "טבלת זמנים",
+        "barChart": "גרף עמודות",
+        "radarChart": "גרף רדאר",
+        "heatmap": "מפת חום"
+      },
+      "segment": "מקטע",
+      "speed": { "label": "מהירות", "desc": "מיעוט עומסים" },
+      "economy": { "label": "חיסכון", "desc": "מיעוט כבישי אגרה" },
+      "scenic": { "label": "נוף", "desc": "מעבר ליד פארקים" },
+      "comm": { "label": "קליטה", "desc": "מעגלי תקשורת מוגברת" }
+    }
+  },
+  "exportManager": {
+    "title": "ניהול ועדכון קבצי HTML מיוצאים",
+    "section1": {
+      "title": "טעינת קובץ אקסל (נתונים)",
+      "desc": "המערכת תחפש אוטומטית את הגיליון: \"קטלוג תרחישים\""
+    },
+    "section2": {
+      "title": "טעינת תיקיית קבצי HTML",
+      "desc": "בחר את התיקייה עם קבצי ה-Exp_SCN...html",
+      "filesDetected": "✓ זוהו {n} קבצים"
+    },
+    "section3": {
+      "title": "הגדרות מתקדמות",
+      "cssPlaceholder": "עיצוב CSS גלובלי (אופציונלי)...",
+      "inaccurate": "יצירת גרסה עם המלצות שגויות (REC_INACCURATE)",
+      "timerLabel": "⏳ זמן מוקצב לתרחיש (בשניות):"
+    },
+    "btn": {
+      "run": "🚀 הרץ עדכון",
+      "processing": "מעבד נתונים..."
+    },
+    "logs": {
+      "title": "לוג מערכת:",
+      "empty": "המתנה לפעולה...",
+      "sheetFound": "📄 נמצא הגיליון המבוקש: \"{name}\"",
+      "sheetNotFound": "⚠️ לא נמצא גיליון בשם \"{name}\". לוקח את הראשון: \"{first}\"",
+      "sheetEmpty": "⚠️ הגיליון ריק.",
+      "columnMissing": "❌ שגיאה: לא נמצאה עמודת SCN_ID בגיליון \"{name}\".",
+      "rowsFailed": "❌ לא הצלחתי לטעון שורות תקינות.",
+      "rowsLoaded": "✅ נטענו {count} שורות מהגיליון \"{name}\"",
+      "excelError": "❌ שגיאה בטעינת האקסל",
+      "htmlLoaded": "📂 נטענו {count} קבצי HTML",
+      "startProcess": "--- מתחיל עיבוד ---",
+      "processed": "✅ עובד: {name} (ID: {id} -> Rec: {rec})",
+      "notFound": "⚠️ לא נמצא באקסל: {name} (זוהה ID: {id}) - הועתק ללא שינוי",
+      "done": "🎉 סיימנו! {count} קבצים עובדו.",
+      "noChanges": "❌ לא בוצעו שינויים."
+    }
+  },
+  "batchGenerator": {
+    "title": "מחולל תרחישים המוני",
+    "noteLabel": "שים לב:",
+    "noteDesc": "וודא שקובץ template.html נמצא בתיקיית public בפרויקט.",
+    "folderLabel": "בחר תיקייה עם קבצי JSON:",
+    "btn": {
+      "generate": "הפק תרחישים והורד ZIP",
+      "processing": "מעבד..."
+    },
+    "logs": {
+      "loaded": "נטענו {count} קבצי JSON.",
+      "noFolder": "אנא טען תיקייה עם קבצי JSON תחילה",
+      "templateNotFound": "לא נמצא קובץ template.html בתיקיית public",
+      "anchorNotFound": "לא נמצא העוגן /* DATA_INJECTION_POINT */ בתבנית. נא לעדכן את template.html",
+      "jsonError": "שגיאה בקריאת JSON בקובץ {name}",
+      "created": "נוצר: {id} ({name})",
+      "success": "התהליך הסתיים בהצלחה! הקובץ ירד.",
+      "error": "שגיאה: {msg}"
+    }
+  },
+  "exported": {
+    "mapLegend": "מקרא מפה",
+    "route": "מסלול",
+    "selectedRoute": "מסלול נבחר",
+    "traffic": "עומס",
+    "toll": "אגרה",
+    "comm": "תקשורת",
+    "park": "פארק",
+    "task": "מטלה",
+    "taskInstruction": "אם יש יותר ממסלול אחד שעומד בדרישות, יש להעדיף את המסלול עם זמן הנסיעה הכולל הקצר מבינהם.",
+    "selectTip": "💡 ניתן לבחור מסלול בלחיצה על הקו במפה או בגרף זמני המקטעים למטלה.",
+    "estimatedTime": "זמן מוערך למטלה:",
+    "recommendation": "המלצת המערכת",
+    "confirm": "אישור בחירה",
+    "filterTitle": "סינון שכבות",
+    "showAll": "הצג הכל",
+    "hideAll": "הסתר הכל",
+    "close": "סגור",
+    "confirmTitle": "אישור בחירה",
+    "confirmQuestion": "בחרת במסלול {letter}. האם אתה בטוח?",
+    "confirmWarning": "שים לב: בחרת במסלול שונה מהמלצת המערכת.",
+    "confirmYes": "כן, אני בטוח",
+    "confirmCancel": "ביטול",
+    "filterRoutes": "מסלולים",
+    "zoomIn": "זום אין",
+    "centerMap": "מרכז מפה",
+    "zoomOut": "זום אאוט",
+    "layers": "שכבות",
+    "origin": "מוצא",
+    "destination": "יעד",
+    "noData": "אין נתונים",
+    "segment": "מקטע",
+    "minutes": "דקות",
+    "vizLegend": "מקרא ויזואליזציה",
+    "segmentTimes": "זמני מקטעים",
+    "speed": { "label": "מהירות", "desc": "מיעוט עומסים" },
+    "economy": { "label": "חיסכון", "desc": "מיעוט כבישי אגרה" },
+    "scenic": { "label": "נוף", "desc": "מעבר ליד פארקים" },
+    "commScore": { "label": "קליטה", "desc": "מעגלי תקשורת מוגברת" }
+  }
+}

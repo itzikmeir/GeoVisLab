@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { useLanguage } from '../i18n/index.tsx';
 
 const BatchGenerator: React.FC = () => {
+  const { dir, t } = useLanguage();
+  const isRtl = dir === 'rtl';
+
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -13,12 +17,13 @@ const BatchGenerator: React.FC = () => {
     if (e.target.files) {
       const jsonFiles = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.json'));
       setFiles(jsonFiles);
-      addLog(`נטענו ${jsonFiles.length} קבצי JSON.`);
+      addLog(t('batchGenerator.logs.loaded', { count: jsonFiles.length }));
     }
   };
-const generateBatch = async () => {
+
+  const generateBatch = async () => {
     if (files.length === 0) {
-      alert("אנא טען תיקייה עם קבצי JSON תחילה");
+      alert(t('batchGenerator.logs.noFolder'));
       return;
     }
 
@@ -27,14 +32,12 @@ const generateBatch = async () => {
     let counter = 1;
 
     try {
-      // 1. טעינת התבנית
       const templateResponse = await fetch('./template.html');
-      if (!templateResponse.ok) throw new Error("לא נמצא קובץ template.html בתיקיית public");
+      if (!templateResponse.ok) throw new Error(t('batchGenerator.logs.templateNotFound'));
       const templateText = await templateResponse.text();
 
-      // בדיקה שהעוגן החדש קיים
       if (!templateText.includes('/* DATA_INJECTION_POINT */')) {
-        throw new Error("לא נמצא העוגן /* DATA_INJECTION_POINT */ בתבנית. נא לעדכן את template.html");
+        throw new Error(t('batchGenerator.logs.anchorNotFound'));
       }
 
       const sortedFiles = files.sort((a, b) => a.name.localeCompare(b.name));
@@ -45,12 +48,12 @@ const generateBatch = async () => {
         try {
           jsonData = JSON.parse(text);
         } catch (e) {
-          addLog(`שגיאה בקריאת JSON בקובץ ${file.name}`);
+          addLog(t('batchGenerator.logs.jsonError', { name: file.name }));
           continue;
         }
 
         const scenarioId = `SCN_${String(counter).padStart(3, '0')}`;
-        
+
         const variants = [
           { type: 'T', label: 'Technical' },
           { type: 'R', label: 'Realism' },
@@ -69,76 +72,66 @@ const generateBatch = async () => {
             meta: jsonData.meta
           };
 
-          // המרה למחרוזת JSON
           const jsonString = JSON.stringify(scenarioData, null, 2);
-          
-          // --- התיקון: יצירת שורת קוד שלמה ---
-          // אנחנו מחליפים את ההערה בשורה: const DATA = { ... };
           const injectionCode = `const DATA = ${jsonString};`;
-          
           let newHtml = templateText.replace('/* DATA_INJECTION_POINT */', injectionCode);
-          
-          // עדכון כותרת
           newHtml = newHtml.replace(/<title>.*?<\/title>/, `<title>${scenarioId}</title>`);
-
           zip.file(`${scenarioId}_${variant.type}.html`, newHtml);
         }
 
-        addLog(`נוצר: ${scenarioId} (${file.name})`);
+        addLog(t('batchGenerator.logs.created', { id: scenarioId, name: file.name }));
         counter++;
       }
 
       const content = await zip.generateAsync({ type: "blob" });
       saveAs(content, "Batch_Scenarios_Output.zip");
-      addLog("התהליך הסתיים בהצלחה! הקובץ ירד.");
+      addLog(t('batchGenerator.logs.success'));
 
     } catch (error: any) {
       console.error(error);
-      addLog(`שגיאה: ${error.message}`);
+      addLog(t('batchGenerator.logs.error', { msg: error.message }));
     } finally {
       setProcessing(false);
     }
   };
 
+  const noteBorderSide = isRtl ? 'borderRight' : 'borderLeft';
+
   return (
-    <div style={{ padding: '20px', direction: 'rtl', color: '#e2e8f0', maxWidth: '800px', margin: '0 auto' }}>
-      <h2 style={{ borderBottom: '2px solid #2563EB', paddingBottom: '10px' }}>מחולל תרחישים המוני</h2>
-      
+    <div style={{ padding: '20px', direction: dir, color: '#e2e8f0', maxWidth: '800px', margin: '0 auto' }}>
+      <h2 style={{ borderBottom: '2px solid #2563EB', paddingBottom: '10px' }}>{t('batchGenerator.title')}</h2>
+
       <div style={{ marginTop: '20px', background: '#1e293b', padding: '20px', borderRadius: '8px' }}>
-        <div style={{ background: '#334155', padding: '10px', borderRadius: '4px', marginBottom: '15px', fontSize: '14px', borderRight: '4px solid #F59E0B' }}>
-          <b>שים לב:</b> וודא שקובץ <code>template.html</code> נמצא בתיקיית <code>public</code> בפרויקט.
+        <div style={{ background: '#334155', padding: '10px', borderRadius: '4px', marginBottom: '15px', fontSize: '14px', [noteBorderSide]: '4px solid #F59E0B' } as React.CSSProperties}>
+          <b>{t('batchGenerator.noteLabel')}</b> {t('batchGenerator.noteDesc').replace(t('batchGenerator.noteLabel'), '').replace(/^[\s:]/, '')}
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', marginBottom: '8px' }}>בחר תיקייה עם קבצי JSON:</label>
-          <input 
-            type="file" 
+          <label style={{ display: 'block', marginBottom: '8px' }}>{t('batchGenerator.folderLabel')}</label>
+          <input
+            type="file"
             // @ts-ignore
             webkitdirectory="true"
-            multiple 
+            multiple
             onChange={handleFolderUpload}
             style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid #334155', borderRadius: '4px', color: 'white' }}
           />
         </div>
 
-        <button 
+        <button
           onClick={generateBatch}
           disabled={processing || files.length === 0}
-          style={{ 
-            width: '100%',
-            padding: '15px', 
-            background: processing ? '#475569' : '#2563EB', 
-            color: 'white', 
-            fontWeight: 'bold', 
-            border: 'none', 
-            borderRadius: '8px', 
-            cursor: processing ? 'not-allowed' : 'pointer'
+          style={{
+            width: '100%', padding: '15px',
+            background: processing ? '#475569' : '#2563EB',
+            color: 'white', fontWeight: 'bold', border: 'none',
+            borderRadius: '8px', cursor: processing ? 'not-allowed' : 'pointer',
           }}
         >
-          {processing ? 'מעבד...' : 'הפק תרחישים והורד ZIP'}
+          {processing ? t('batchGenerator.btn.processing') : t('batchGenerator.btn.generate')}
         </button>
 
-        <div style={{ marginTop: '20px', background: '#0f172a', padding: '10px', borderRadius: '4px', height: '200px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '12px', border: '1px solid #334155' }}>
+        <div style={{ marginTop: '20px', background: '#0f172a', padding: '10px', borderRadius: '4px', height: '200px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '12px', border: '1px solid #334155', direction: 'ltr' }}>
           {logs.map((l, i) => <div key={i}>{l}</div>)}
         </div>
       </div>
