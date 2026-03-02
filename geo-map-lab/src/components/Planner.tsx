@@ -148,7 +148,11 @@ function buildParticipantHtml(args: {
   #overlaySvg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: auto; }
 
   .ctrlCol { position: absolute; left: 10px; top: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 10; }
-  
+  [dir="ltr"] .ctrlCol {
+    left: auto;
+    right: 10px;
+  }
+
   .ctrlBtn, .filterBtn { 
       width: 40px; height: 40px; 
       border-radius: 8px; 
@@ -232,6 +236,12 @@ function buildParticipantHtml(args: {
       transition: top 0.3s ease-in-out;
       z-index: 100;
       display: none;
+  }
+  [dir="ltr"] #selected-route-indicator {
+      right: auto;
+      left: -2px;
+      border-left: none;
+      border-right: 14px solid #3B82F6;
   }
 
   /* 3. LEGEND PANEL (Leftmost) */
@@ -454,7 +464,7 @@ function buildParticipantHtml(args: {
              <div style="position:absolute; top:0; width:100%; height:2px; background:#FFE100"></div>
              <div style="position:absolute; bottom:0; width:100%; height:2px; background:#FFE100"></div>
              
-             <div style="width:14px; height:14px; background:#FFE100; border:1px solid rgba(0,0,0,0.7); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#000; position:absolute; z-index:5; font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif;">₪</div>
+             <div style="width:14px; height:14px; background:#FFE100; border:1px solid rgba(0,0,0,0.7); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#000; position:absolute; z-index:5; font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif;">$</div>
            </div>
            <span>${args.strings.toll ?? 'אגרה'}</span>
         </div>
@@ -763,7 +773,7 @@ function drawMap() {
     if(filters.toll) DATA.catTollLabels.forEach(l => {
         const p = project(l.coord);
         const g = document.createElementNS('http://www.w3.org/2000/svg','g');
-        g.append(circle(p.x, p.y, 7, DATA.colors.toll, '#000'), text(p.x, p.y+3, '₪', 10, '#000'));
+        g.append(circle(p.x, p.y, 7, DATA.colors.toll, '#000'), text(p.x, p.y+3, '$', 10, '#000'));
         gTollIco.appendChild(g);
     });
 
@@ -1066,9 +1076,11 @@ function renderGantt() {
     for(let i=0; i<=mins; i++){
         const pos = (i*60/maxT)*100; if(pos > 100) break;
         const tk = document.createElement('div');
-        tk.style.position='absolute'; tk.style.right=pos+'%'; tk.style.transform='translateX(50%)'; tk.textContent=i;
+        tk.style.position='absolute';
+        if (DATA.dir === 'ltr') { tk.style.left=pos+'%'; tk.style.transform='translateX(-50%)'; } else { tk.style.right=pos+'%'; tk.style.transform='translateX(50%)'; }
+        tk.textContent=i;
         const ln = document.createElement('div');
-        ln.style.position='absolute'; ln.style.right=pos+'%'; ln.style.height='4px'; ln.style.width='1px'; ln.style.background='#555'; ln.style.top='-4px';
+        ln.style.position='absolute'; if (DATA.dir === 'ltr') { ln.style.left=pos+'%'; } else { ln.style.right=pos+'%'; } ln.style.height='4px'; ln.style.width='1px'; ln.style.background='#555'; ln.style.top='-4px';
         ax.append(ln, tk);
     }
 
@@ -1077,8 +1089,8 @@ function renderGantt() {
     unit.className = 'gAxisUnitLabel';
     unit.textContent = DATA.strings.minutes ?? 'דקות';
     // place at viewport far-right; we'll compute vertical position to align with axis
-    unit.style.position = 'fixed';
-    unit.style.right = '30px';
+    unit.style.position = 'absolute';
+    unit.style[DATA.dir === 'ltr' ? 'left' : 'right'] = '30px';
     unit.style.zIndex = '9999';
     document.body.appendChild(unit);
     // compute vertical center of axis and align label center to it
@@ -1569,7 +1581,7 @@ function emphasizeParks(map: maplibregl.Map) {
 // ✅ Spatial categories styling
 const CAT_TRAFFIC_COLOR = "#FF0022"; // אדום בוהק
 const CAT_TOLL_COLOR = "#FFE100"; // צהוב בוהק
-const CAT_TOLL_LABEL_TEXT = "₪";
+const CAT_TOLL_LABEL_TEXT = "$";
 const CAT_COMM_FILL = "rgba(170,60,255,0.28)";
 const CAT_COMM_OUTLINE = "rgba(170,60,255,0.65)";
 
@@ -2916,14 +2928,17 @@ const ROUTE_IDS: RouteId[] = ["A", "B", "C"];
 type BadgePoint = { id: BadgeId; label: string; coord: LngLat };
 type AnchorPoint = { id: BadgeId; coord: LngLat };
 
-function badgeLabelFromId(id: BadgeId): string {
-    return id === "A" ? "מסלול א" : id === "B" ? "מסלול ב" : "מסלול ג";
+function badgeLabelFromId(id: BadgeId, isRtl: boolean): string {
+    if (id === "A") return isRtl ? "מסלול א" : "Route A";
+    if (id === "B") return isRtl ? "מסלול ב" : "Route B";
+    if (id === "C") return isRtl ? "מסלול ג" : "Route C";
+    return id;
 }
 
-function buildBadgeFC(badges: BadgePoint[]) {
+function buildBadgeFC(badges: BadgePoint[], isRtl: boolean) {
     return fcPoints(
         badges.map((b) => b.coord),
-        badges.map((b) => ({ id: b.id, label: (b as any).label ? (b as any).label : badgeLabelFromId(b.id) }))
+        badges.map((b) => ({ id: b.id, label: (b as any).label ? (b as any).label : badgeLabelFromId(b.id, isRtl) }))
     );
 }
 
@@ -3611,7 +3626,7 @@ function SegmentCircle({ n }: { n: number }) {
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontWeight: 950,
+                fontWeight: 700,
                 fontSize: 12,
                 boxShadow: "0 1px 6px rgba(0,0,0,0.25)",
                 border: "1px solid rgba(255,255,255,0.25)",
@@ -3647,7 +3662,7 @@ function RoutePickerRight(props: {
                 height: "fit-content",
             }}
         >
-            <div style={{ fontWeight: 950, marginBottom: 10, opacity: 0.9 }}>{title ?? t('planner.triple.routePickerTitle')}</div>
+            <div style={{ fontWeight: 700, marginBottom: 10, opacity: 0.9 }}>{title ?? t('planner.triple.routePickerTitle')}</div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {(["A", "B", "C"] as BadgeId[]).map((id) => {
@@ -3689,8 +3704,8 @@ function RoutePickerRight(props: {
                                 />
                             )}
                             
-                            <div style={{ fontWeight: 950 }}>{t('planner.results.route')} {isRtl ? routeHebrew(id) : id}</div>
-                            <div style={{ opacity: 0.85, fontWeight: 900, fontSize: 12 }}>
+                            <div style={{ fontWeight: 700 }}>{t('planner.results.route')} {isRtl ? routeHebrew(id) : id}</div>
+                            <div style={{ opacity: 0.85, fontWeight: 700, fontSize: 12 }}>
                                 {r ? fmtMinSecFromSeconds(r.totalTimeS) : "--:--"}
                             </div>
                         </div>
@@ -3709,7 +3724,8 @@ function VisualizationModal(props: {
     onSelectRoute: (id: BadgeId) => void;
 }) {
     const { open, onClose, routeScores, selectedRoute, onSelectRoute } = props;
-    const { t } = useLanguage();
+    const { t, dir } = useLanguage();
+    const isRtl = dir === 'rtl';
     const [tab, setTab] = useState<VizTab>("times");
     const VIZ_CRITERIA_T = useMemo(() => [
         { key: "speedScore" as const, label: t('planner.viz.speed.label'), color: "#3B82F6" },
@@ -3741,8 +3757,8 @@ function VisualizationModal(props: {
                 background: "rgba(255,255,255,0.04)",
             }}
         >
-            <div style={{ fontWeight: 950, fontSize: 15, textAlign: "right" }}>{p.title}</div>
-            {p.subtitle ? <div style={{ marginTop: 6, fontSize: 12, opacity: 0.82, textAlign: "right" }}>{p.subtitle}</div> : null}
+            <div style={{ fontWeight: 700, fontSize: 15, textAlign: isRtl ? "right" : "left" }}>{p.title}</div>
+            {p.subtitle ? <div style={{ marginTop: 6, fontSize: 12, opacity: 0.82, textAlign: isRtl ? "right" : "left" }}>{p.subtitle}</div> : null}
             <div style={{ marginTop: 12 }}>{p.children}</div>
         </div>
     );
@@ -3758,7 +3774,7 @@ function VisualizationModal(props: {
                 background: p.active ? "rgba(140,203,255,0.18)" : "rgba(255,255,255,0.06)",
                 color: "#e8eefc",
                 cursor: "pointer",
-                fontWeight: 900,
+                fontWeight: 700,
                 fontSize: 13,
                 lineHeight: 1,
             }}
@@ -3787,7 +3803,7 @@ function VisualizationModal(props: {
         return (
             <Card
                 title={t('planner.viz.cards.timesTable')}
-                subtitle="גרף נערם אופקי מימין לשמאל. לחץ על שורה כדי לבחור מסלול."
+                subtitle={t('planner.viz.subtitleStacked')}
             >
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {(["A", "B", "C"] as BadgeId[]).map((id) => {
@@ -3818,7 +3834,7 @@ function VisualizationModal(props: {
                                 }}
                                 title="לחץ כדי לבחור מסלול"
                             >
-                                <div style={{ fontWeight: 950, fontSize: 14, textAlign: "right" }}>מסלול {routeHebrew(id)}</div>
+                                <div style={{ fontWeight: 700, fontSize: 14, textAlign: "right" }}>מסלול {routeHebrew(id)}</div>
 
                                 <div
                                     style={{
@@ -3852,7 +3868,7 @@ function VisualizationModal(props: {
                                                     display: "flex",
                                                     alignItems: "center",
                                                     justifyContent: "center",
-                                                    fontWeight: 950,
+                                                    fontWeight: 700,
                                                     color: "white",
                                                     fontSize: 13,
                                                     textShadow: "0 1px 2px rgba(0,0,0,0.40)",
@@ -3868,7 +3884,7 @@ function VisualizationModal(props: {
                                     })}
                                 </div>
 
-                                <div style={{ textAlign: "left", fontWeight: 900, fontSize: 13 }}>{fmtMinSecFromSeconds(r.totalTimeS)}</div>
+                                <div style={{ textAlign: "left", fontWeight: 700, fontSize: 13 }}>{fmtMinSecFromSeconds(r.totalTimeS)}</div>
                             </div>
                         );
                     })}
@@ -3926,7 +3942,7 @@ function VisualizationModal(props: {
         const maxTotal = VIZ_CRITERIA_T.length * 100; // additive, each metric is 0..100
 
         return (
-            <Card title={t('planner.viz.cards.barChart')} subtitle="גרף עמודות נערמות (נערם מתווסף, לא נירמול ל־100%).">
+            <Card title={t('planner.viz.cards.barChart')} subtitle={t('planner.viz.subtitleBars')}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 14, alignItems: "start" }}>
                     <div style={{ overflowX: "auto" }}>
                         <div style={{ display: "flex", gap: 14, alignItems: "flex-end", paddingBottom: 6 }}>
@@ -3989,7 +4005,7 @@ function VisualizationModal(props: {
                                                             // עיצוב טקסט שצף מעל צבעים שונים
                                                             color: "#ffffff",
                                                             textShadow: "0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.8)", // צל שחור חזק לקריאות
-                                                            fontWeight: 950,
+                                                            fontWeight: 700,
                                                             fontSize: 12,
                                                             padding: "0 4px"
                                                         }}>
@@ -4001,7 +4017,7 @@ function VisualizationModal(props: {
                                             })}
                                         </div>
 
-                                        <div style={{ marginTop: 10, fontWeight: 950 }}>{<SegmentLabel n={s.segment} />}</div>
+                                        <div style={{ marginTop: 10, fontWeight: 700 }}>{<SegmentLabel n={s.segment} />}</div>
                                     </div>
                                 );
                             })}
@@ -4039,7 +4055,7 @@ function VisualizationModal(props: {
         };
 
         return (
-            <Card title={t('planner.viz.cards.radarChart')} subtitle="3 רדארים (מקטע 1–3). בכל רדאר מוצגים ציוני הקטגוריות.">
+            <Card title={t('planner.viz.cards.radarChart')} subtitle={t('planner.viz.subtitleRadar')}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 14, alignItems: "start" }}>
                     <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "space-evenly" }}>
                         {segs.map((s) => (
@@ -4053,9 +4069,9 @@ function VisualizationModal(props: {
                                     background: "rgba(0,0,0,0.06)",
                                 }}
                             >
-                                <div style={{ fontWeight: 950, marginBottom: 8, textAlign: "right" }}>
+                                <div style={{ fontWeight: 700, marginBottom: 8, textAlign: "right" }}>
                                     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                                        <span style={{ fontWeight: 950 }}>{t('planner.viz.segment')}</span>
+                                        <span style={{ fontWeight: 700 }}>{t('planner.viz.segment')}</span>
                                         <SegmentCircle n={s.segment} />
                                     </span>
                                 </div>
@@ -4112,7 +4128,7 @@ function VisualizationModal(props: {
                                                         color: fg,
                                                         borderRadius: 999,
                                                         fontSize: 11,
-                                                        fontWeight: 950,
+                                                        fontWeight: 700,
                                                         boxShadow: "0 1px 6px rgba(0,0,0,0.25)",
                                                         border: "1px solid rgba(255,255,255,0.20)",
                                                         whiteSpace: "nowrap",
@@ -4155,7 +4171,7 @@ function VisualizationModal(props: {
         const colW = 96;
 
         return (
-            <Card title={t('planner.viz.cards.heatmap')} subtitle="טבלה עם עמודות ברוחב קבוע. המספרים תמיד בולטים (רקע לא כהה מדי).">
+            <Card title={t('planner.viz.cards.heatmap')} subtitle={t('planner.viz.subtitleHeatmap')}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 14, alignItems: "start" }}>
                     <div style={{ overflowX: "auto" }}>
                         <table
@@ -4183,7 +4199,7 @@ function VisualizationModal(props: {
                                                     color: contrastText(m.color),
                                                     borderRadius: 999,
                                                     padding: "4px 10px",
-                                                    fontWeight: 950,
+                                                    fontWeight: 700,
                                                     border: "1px solid rgba(255,255,255,0.20)",
                                                     boxShadow: "0 1px 6px rgba(0,0,0,0.18)",
                                                     whiteSpace: "nowrap",
@@ -4200,7 +4216,7 @@ function VisualizationModal(props: {
                                     <tr key={s.segment}>
                                         <td style={{ padding: 2, textAlign: "right", width: 78 }}>
                                             <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                                                <span style={{ fontWeight: 900, opacity: 0.9 }}>{t('planner.viz.segment')}</span>
+                                                <span style={{ fontWeight: 700, opacity: 0.9 }}>{t('planner.viz.segment')}</span>
                                                 <SegmentCircle n={s.segment} />
                                             </div>
                                         </td>
@@ -4215,7 +4231,7 @@ function VisualizationModal(props: {
                                                             borderRadius: 10,
                                                             padding: "8px 6px",
                                                             textAlign: "center",
-                                                            fontWeight: 950,
+                                                            fontWeight: 700,
                                                             color: "rgba(8,10,14,0.92)",
                                                             border: "1px solid rgba(0,0,0,0.10)",
                                                         }}
@@ -4249,6 +4265,7 @@ function VisualizationModal(props: {
                 alignItems: "center",
                 justifyContent: "center",
                 padding: 16,
+                direction: dir,
             }}
             onClick={onClose}
         >
@@ -4266,7 +4283,7 @@ function VisualizationModal(props: {
                 onClick={(e) => e.stopPropagation()}
             >
                 <div style={{ padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                    <div style={{ fontWeight: 950, fontSize: 16 }}>{t('planner.viz.modal.title')}</div>
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>{t('planner.viz.modal.title')}</div>
                     <button
                         onClick={onClose}
                         style={{
@@ -4276,7 +4293,7 @@ function VisualizationModal(props: {
                             background: "rgba(255,255,255,0.06)",
                             color: "white",
                             cursor: "pointer",
-                            fontWeight: 900,
+                            fontWeight: 700,
                         }}
                     >
                         {t('planner.viz.modal.close')}
@@ -4372,7 +4389,7 @@ function SegmentLabel({ n }: { n: number }) {
     const { t } = useLanguage();
     return (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 7, justifyContent: "center" }}>
-            <span style={{ fontWeight: 900, opacity: 0.9 }}>{t('planner.viz.segment')}</span>
+            <span style={{ fontWeight: 700, opacity: 0.9 }}>{t('planner.viz.segment')}</span>
             <SegmentCircle n={n} />
         </div>
     );
@@ -4452,6 +4469,7 @@ export default function App() {
         economy: { label: t('exported.economy.label'), desc: t('exported.economy.desc') },
         scenic: { label: t('exported.scenic.label'), desc: t('exported.scenic.desc') },
         commScore: { label: t('exported.commScore.label'), desc: t('exported.commScore.desc') },
+        mapDesc: t('exported.mapDesc'),
     }), [uiLang, t]);
 
     const originalTextFieldRef = useRef<Record<string, any>>({});
@@ -4639,7 +4657,7 @@ export default function App() {
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
-        setFC(map, "cat-toll-labels", fcPoints(catTollLabels.map((l) => l.coord), catTollLabels.map((l) => ({ label: "₪", side: l.side }))));
+        setFC(map, "cat-toll-labels", fcPoints(catTollLabels.map((l) => l.coord), catTollLabels.map((l) => ({ label: "$", side: l.side }))));
     }, [catTollLabels]);
 
     useEffect(() => {
@@ -5516,12 +5534,12 @@ export default function App() {
                 winner = passingRoutes[0].rid;
 
                 const eliminatedCount = routeData.length - passingRoutes.length;
-                note = `סף ${Math.round(thresholdScore)}: ${eliminatedCount} נפסלו. הזוכה ${winner} (המהיר מבין העוברים: ${(passingRoutes[0].totalTimeS / 60).toFixed(1)} דק').`;
+                note = t('planner.results.winnerNote', { route: winner, score: Math.round(thresholdScore).toString(), eliminated: eliminatedCount.toString(), time: (passingRoutes[0].totalTimeS / 60).toFixed(1) });
             } else {
                 // אף אחד לא עובר -> הכי פחות גרוע מנצח
                 routeData.sort((a, b) => b.primaryScore - a.primaryScore);
                 winner = routeData[0].rid;
-                note = `אזהרה: אף מסלול לא עבר את סף ${Math.round(thresholdScore)}. נבחר ${winner} בעל הציון הגבוה ביותר (${Math.round(routeData[0].primaryScore)}).`;
+                note = t('planner.results.winnerWarning', { threshold: Math.round(thresholdScore).toString(), route: winner, score: Math.round(routeData[0].primaryScore).toString() });
             }
 
         } else {
@@ -5565,7 +5583,7 @@ export default function App() {
 
             candidates.sort((a, b) => b.score - a.score); // הגבוה מנצח
             winner = candidates[0].rid;
-            note = `פייבוריט: ${favored} • מצב: ${taskMode} • הזוכה: ${winner}`;
+            note = t('planner.results.winnerPreferred', { preferred: favored, route: winner, score: candidates[0].score.toFixed(2) });
         }
 
         // --- כאן היה הקוד הכפול שמחקתי ---
@@ -5603,6 +5621,7 @@ export default function App() {
         setTaskWinnerRoute,
         setTaskWinnerNote,
         setSelectedRoute,
+        t,
     ])
 
     // INIT MAP (once)
@@ -5710,7 +5729,7 @@ export default function App() {
 
                 const updateBadgeOnMap = (nextBadges: BadgePoint[]) => {
                     const a = anchorsRef.current;
-                    setFC(map, "triple-badge-points", buildBadgeFC(nextBadges));
+                    setFC(map, "triple-badge-points", buildBadgeFC(nextBadges, isRtl));
                     if (a.length) setFC(map, "triple-badge-lines", buildConnectorFC(map, a, nextBadges)); // ✅ border-leg
                 };
 
@@ -6164,11 +6183,11 @@ export default function App() {
         const props: any[] = [];
         if (start) {
             coords.push(start);
-            props.push({ kind: "start", label: "מוצא" });
+            props.push({ kind: "start", label: t('exported.origin') });
         }
         if (end) {
             coords.push(end);
-            props.push({ kind: "end", label: "יעד" });
+            props.push({ kind: "end", label: t('exported.destination') });
         }
 
         setFC(map, "start-end", fcPoints(coords, props));
@@ -6324,13 +6343,13 @@ export default function App() {
             if (euclidDeg(badgeB, badgeC) < thresh) badgeC = clampToBounds(nudge(badgeC, +1.4), bounds, 0.07);
 
             const newBadges: BadgePoint[] = [
-                { id: "A", label: "מסלול א", coord: badgeA },
-                { id: "B", label: "מסלול ב", coord: badgeB },
-                { id: "C", label: "מסלול ג", coord: badgeC },
+                { id: "A", label: badgeLabelFromId("A", isRtl), coord: badgeA },
+                { id: "B", label: badgeLabelFromId("B", isRtl), coord: badgeB },
+                { id: "C", label: badgeLabelFromId("C", isRtl), coord: badgeC },
             ];
             setBadges(newBadges);
 
-            setFC(map, "triple-badge-points", buildBadgeFC(newBadges));
+            setFC(map, "triple-badge-points", buildBadgeFC(newBadges, isRtl));
             setFC(map, "triple-badge-lines", buildConnectorFC(map, newAnchors, newBadges)); // ✅ border-leg
             // ✅ Force: אחרי חישוב – ברירת מחדל מסלול א' + להציג מיד מקטעים למסלול א'
             setSelectedRoute("A");
@@ -7645,11 +7664,11 @@ export default function App() {
                         backdropFilter: "blur(6px)",
                         minWidth: 165,
                         pointerEvents: "none",
-                        direction: "rtl",   // ✅ עברית
-                        textAlign: "right", // ✅ יישור לימין
+                        direction: dir,
+                        textAlign: isRtl ? "right" : "left",
                     }}
                 >
-                    <div style={{ fontWeight: 900, marginBottom: 8, opacity: 0.95 }}>{t('planner.legend.title')}</div>
+                    <div style={{ fontWeight: 700, marginBottom: 8, opacity: 0.95 }}>{t('planner.legend.title')}</div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
                         <div
@@ -7681,10 +7700,10 @@ export default function App() {
                                     background: CAT_TOLL_COLOR,
                                     border: "1px solid rgba(11,18,32,0.9)",
                                     color: "#0b1220",
-                                    fontWeight: 900,
+                                    fontWeight: 700,
                                 }}
                             >
-                                ₪
+                                $
                             </span>
                         </div>
                     </div>
@@ -7728,7 +7747,7 @@ export default function App() {
                             alignItems: "center",
                             justifyContent: "center",
                             padding: 16,
-                            direction: "rtl",
+                            direction: dir,
                         }}
                         onMouseDown={() => setShowResults(false)}
                     >
@@ -7756,7 +7775,7 @@ export default function App() {
                                     background: "rgba(10, 14, 22, 0.98)",
                                 }}
                             >
-                                <div style={{ fontWeight: 900, fontSize: 16 }}>{t('planner.results.title')}</div>
+                                <div style={{ fontWeight: 700, fontSize: 16 }}>{t('planner.results.title')}</div>
 
                                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                                     <button
@@ -7771,7 +7790,7 @@ export default function App() {
                                             color: "white",
                                             cursor: !routeScores || routeScores.length === 0 ? "not-allowed" : "pointer",
                                             opacity: !routeScores || routeScores.length === 0 ? 0.55 : 1,
-                                            fontWeight: 900,
+                                            fontWeight: 700,
                                         }}
                                     >
                                         {t('planner.results.exportCsv')}
@@ -7786,7 +7805,7 @@ export default function App() {
                                             background: "rgba(255,255,255,0.06)",
                                             color: "white",
                                             cursor: "pointer",
-                                            fontWeight: 900,
+                                            fontWeight: 700,
                                         }}
                                     >
                                         {t('planner.results.close')}
@@ -7880,7 +7899,7 @@ export default function App() {
                                         textAlign: "right",
                                         padding: "8px 8px",
                                         borderBottom: "1px solid rgba(255,255,255,0.15)",
-                                        fontWeight: 900,
+                                        fontWeight: 700,
                                         whiteSpace: "nowrap",
                                     };
 
@@ -7923,7 +7942,7 @@ export default function App() {
                                                                 colSpan={9}
                                                                 style={{
                                                                     padding: "10px 8px",
-                                                                    fontWeight: 900,
+                                                                    fontWeight: 700,
                                                                     borderBottom: "1px solid rgba(255,255,255,0.10)",
                                                                     background: "rgba(255,255,255,0.03)",
                                                                 }}
@@ -7942,20 +7961,20 @@ export default function App() {
                                                                 <td style={tdBase}>{sc(Number(sg.scenicScore ?? 0))}</td>
                                                                 <td style={tdBase}>{sc(Number(sg.commScore ?? 0))}</td>
                                                                 <td style={{ ...tdBase, ...dividerL, fontSize: 11, opacity: 0.95 }}>{weightText}</td>
-                                                                <td style={{ ...tdBase, fontWeight: 900 }}>{shiklul0100(sg)}</td>
+                                                                <td style={{ ...tdBase, fontWeight: 700 }}>{shiklul0100(sg)}</td>
                                                             </tr>
                                                         ))}
 
                                                         <tr style={{ background: "rgba(255,255,255,0.05)" }}>
-                                                            <td style={{ ...tdBase, fontWeight: 900 }}>{t('planner.results.total')}</td>
-                                                            <td style={{ ...tdBase, fontWeight: 900 }}>{km(Number(rs.totalLengthM ?? 0))}</td>
-                                                            <td style={{ ...tdBase, fontWeight: 900 }}>{mins(Number(rs.totalTimeS ?? 0))}</td>
-                                                            <td style={{ ...tdBase, ...dividerL, fontWeight: 900 }}>—</td>
-                                                            <td style={{ ...tdBase, fontWeight: 900 }}>—</td>
-                                                            <td style={{ ...tdBase, fontWeight: 900 }}>—</td>
-                                                            <td style={{ ...tdBase, fontWeight: 900 }}>—</td>
-                                                            <td style={{ ...tdBase, ...dividerL, fontWeight: 900 }}>—</td>
-                                                            <td style={{ ...tdBase, fontWeight: 900 }}>{avgShiklulRoute(rs)}</td>
+                                                            <td style={{ ...tdBase, fontWeight: 700 }}>{t('planner.results.total')}</td>
+                                                            <td style={{ ...tdBase, fontWeight: 700 }}>{km(Number(rs.totalLengthM ?? 0))}</td>
+                                                            <td style={{ ...tdBase, fontWeight: 700 }}>{mins(Number(rs.totalTimeS ?? 0))}</td>
+                                                            <td style={{ ...tdBase, ...dividerL, fontWeight: 700 }}>—</td>
+                                                            <td style={{ ...tdBase, fontWeight: 700 }}>—</td>
+                                                            <td style={{ ...tdBase, fontWeight: 700 }}>—</td>
+                                                            <td style={{ ...tdBase, fontWeight: 700 }}>—</td>
+                                                            <td style={{ ...tdBase, ...dividerL, fontWeight: 700 }}>—</td>
+                                                            <td style={{ ...tdBase, fontWeight: 700 }}>{avgShiklulRoute(rs)}</td>
                                                         </tr>
                                                     </Fragment>
                                                 ))}
@@ -7987,7 +8006,7 @@ export default function App() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     {/* --- התחלת הבלוק החדש: כפתורי ניהול (JSON + טעינה) --- */}
                     <div style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "center" }}>
-                    <div style={{ fontWeight: 900, fontSize: 22, marginRight: 10, fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif"}}>{t('planner.panel.title')}</div>
+                    <div style={{ fontWeight: 700, fontSize: 22, marginRight: 10, fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif"}}>{t('planner.panel.title')}</div>
    
                         {/* 1. כפתור JSON (החדש) */}
                         <button
@@ -8054,7 +8073,7 @@ export default function App() {
                 </div>
                 {/* Map data row */}
                 <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                    <div style={{ fontWeight: 900, marginBottom: 10 }}>{t('planner.mapData.title')}</div>
+                    <div style={{ fontWeight: 700, marginBottom: 10 }}>{t('planner.mapData.title')}</div>
                     {/* --- התחלת הקוד החדש --- */}
                     <div style={{ marginBottom: 10 }}>
                         <div style={{ fontWeight: 800, marginBottom: 6 }}>{t('planner.mapData.mapStyle')}</div>
@@ -8065,7 +8084,7 @@ export default function App() {
                                     flex: 1, padding: "6px", borderRadius: 6, border: "none", cursor: "pointer",
                                     background: mapStyleType === 'vector' ? "rgba(255,255,255,0.2)" : "transparent",
                                     color: mapStyleType === 'vector' ? "white" : "rgba(255,255,255,0.5)",
-                                    fontWeight: 900
+                                    fontWeight: 700
                                 }}
                             >
                                 {t('planner.mapData.regular')}
@@ -8076,7 +8095,7 @@ export default function App() {
                                     flex: 1, padding: "6px", borderRadius: 6, border: "none", cursor: "pointer",
                                     background: mapStyleType === 'satellite' ? "rgba(34, 197, 94, 0.25)" : "transparent",
                                     color: mapStyleType === 'satellite' ? "#4ade80" : "rgba(255,255,255,0.5)",
-                                    fontWeight: 900
+                                    fontWeight: 700
                                 }}
                             >
                                 {t('planner.mapData.satellite')}
@@ -8098,7 +8117,7 @@ export default function App() {
                                     color: "#e8eefc",
                                     fontWeight: 800,
                                     outline: "none",
-                                    direction: "rtl",
+                                    direction: dir,
                                 }}
                             >
                                 <option value="he">עברית</option>
@@ -8115,7 +8134,7 @@ export default function App() {
                                 background: "rgba(255,255,255,0.06)",
                                 color: "#e8eefc",
                                 cursor: "pointer",
-                                fontWeight: 900,
+                                fontWeight: 700,
                                 whiteSpace: "nowrap",
                                 display: "flex",
                                 alignItems: "center",
@@ -8165,7 +8184,7 @@ export default function App() {
                             onMouseDown={(e) => e.stopPropagation()}
                         >
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
-                                <div style={{ fontWeight: 900, fontSize: 16 }}>{t('planner.mapData.layerManager')}</div>
+                                <div style={{ fontWeight: 700, fontSize: 16 }}>{t('planner.mapData.layerManager')}</div>
                                 <button
                                     onClick={() => setShowLayerManager(false)}
                                     style={{
@@ -8175,7 +8194,7 @@ export default function App() {
                                         borderRadius: 10,
                                         padding: "8px 10px",
                                         cursor: "pointer",
-                                        fontWeight: 900,
+                                        fontWeight: 700,
                                     }}
                                     title="סגור"
                                 >
@@ -8183,7 +8202,7 @@ export default function App() {
                                 </button>
                             </div>
 
-                            <div style={{ fontWeight: 900, marginBottom: 8 }}>{t('planner.mapData.baseLayers')}</div>
+                            <div style={{ fontWeight: 700, marginBottom: 8 }}>{t('planner.mapData.baseLayers')}</div>
                             <div style={{ display: "grid", gap: 8 }}>
                                 {[
                                     { key: "roads", label: t('planner.mapData.roads'), v: showRoads, set: setShowRoads },
@@ -8199,7 +8218,7 @@ export default function App() {
                             </div>
 
                             <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.12)" }}>
-                                <div style={{ fontWeight: 900, marginBottom: 8 }}>{t('planner.mapData.spatialCategories')}</div>
+                                <div style={{ fontWeight: 700, marginBottom: 8 }}>{t('planner.mapData.spatialCategories')}</div>
                                 <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>
                                     {t('planner.mapData.spatialLayersTip')}
                                 </div>
@@ -8226,7 +8245,7 @@ export default function App() {
                     </div>
                 )}
                 <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                    <div style={{ fontWeight: 900, marginBottom: 10 }}>{t('planner.mode.title')}</div>
+                    <div style={{ fontWeight: 700, marginBottom: 10 }}>{t('planner.mode.title')}</div>
 
                     {/* טוגל כפתורים */}
                     <div style={{
@@ -8274,20 +8293,20 @@ export default function App() {
                     <div style={{ paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
                         {mode === "TRIPLE" && (
                             <div style={{ fontSize: 13, opacity: 0.9 }}>
-                                סטטוס בחירה: <b>{triplePickArmed ? "פעיל" : "ממתין"}</b> (קליק ראשון=מוצא, שני=יעד).
+                                {t('planner.mode.statusLabel')} <b>{triplePickArmed ? t('planner.mode.statusActive') : t('planner.mode.statusWaiting')}</b> {t('planner.mode.statusHint')}
                                 {start && end && <div style={{ color: "#4ade80", fontWeight: 700, marginTop: 4 }}>✓ נבחרו נקודות.</div>}
                             </div>
                         )}
                         {mode === "SINGLE" && (
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                                 <span>נקודות: <b>{singleWaypoints.length}</b>, מרחק: <b>{fmtDistance(singleDist)}</b></span>
-                                <button onClick={clearSingle} style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(255,255,255,0.1)", color: "white", border: "none", cursor: "pointer" }}>ניקוי 🗑️</button>
+                                <button onClick={clearSingle} style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(255,255,255,0.1)", color: "white", border: "none", cursor: "pointer" }}>{t('planner.mode.clearBtn')}</button>
                             </div>
                         )}
                         {mode === "MEASURE" && (
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                                 <span>מרחק מצטבר: <b>{fmtDistance(measureDist)}</b></span>
-                                <button onClick={clearMeasure} style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(255,255,255,0.1)", color: "white", border: "none", cursor: "pointer" }}>ניקוי 🗑️</button>
+                                <button onClick={clearMeasure} style={{ padding: "2px 8px", borderRadius: 4, background: "rgba(255,255,255,0.1)", color: "white", border: "none", cursor: "pointer" }}>{t('planner.mode.clearBtn')}</button>
                             </div>
                         )}
                     </div>
@@ -8302,7 +8321,7 @@ export default function App() {
                     <>
 
                         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                            <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.triple.step1')}</div>
+                            <div style={{ fontWeight: 700, marginBottom: 6 }}>{t('planner.triple.step1')}</div>
 
                             <div style={{ fontWeight: 800, marginBottom: 8 }}>{t('planner.triple.diversity')}</div>
                             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -8331,7 +8350,7 @@ export default function App() {
                                         border: "1px solid rgba(255,255,255,0.15)",
                                         background: "rgba(255,255,255,0.06)",
                                         color: "#e8eefc",
-                                        fontWeight: 900,
+                                        fontWeight: 700,
                                         direction: "ltr",
                                     }}
                                     title="אחוז שונות"
@@ -8350,7 +8369,7 @@ export default function App() {
                                         background: !canTriple ? "rgba(255,255,255,0.06)" : "rgba(140,203,255,0.22)",
                                         color: "#e8eefc",
                                         cursor: !canTriple ? "not-allowed" : "pointer",
-                                        fontWeight: 900,
+                                        fontWeight: 700,
                                         opacity: isRoutingTriple ? 0.75 : 1,
                                     }}
                                     title={!canTriple ? "בחר מוצא ויעד כדי לאפשר חישוב" : t('planner.actions.calculate')}
@@ -8368,21 +8387,21 @@ export default function App() {
                                         background: "transparent",
                                         color: "#e8eefc",
                                         cursor: "pointer",
-                                        fontWeight: 900,
+                                        fontWeight: 700,
                                     }}
                                     title={t('planner.actions.clearAll')}
                                 >
-                                    ניקוי 🗑️
+                                    {t('planner.mode.clearBtn')}
                                 </button>
                             </div>
 
                             <div style={{ fontSize: 12, opacity: 0.75, marginTop: 10, lineHeight: 1.35 }}>
-                                אחרי חישוב אפשר <b>לגרור</b> דגלונים (A/B/C) ולראות עדכונים.
+                                {t('planner.mode.dragTip')}
                             </div>
                         </div>
 
                         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                            <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.triple.step2')}</div>
+                            <div style={{ fontWeight: 700, marginBottom: 6 }}>{t('planner.triple.step2')}</div>
                             <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 10 }}>{t('planner.triple.routeSelectHint')}</div>
 
                             <div style={{ fontWeight: 800, marginBottom: 8 }}>{t('planner.triple.selectRoute')}</div>
@@ -8403,7 +8422,7 @@ export default function App() {
                                             background: selectedRoute === r.id ? "rgba(30,78,216,0.22)" : "transparent",
                                             color: "#e8eefc",
                                             cursor: "pointer",
-                                            fontWeight: 900,
+                                            fontWeight: 700,
                                         }}
                                         title="בחירת מסלול תציג את חלוקת המקטעים רק עליו"
                                     >
@@ -8414,7 +8433,7 @@ export default function App() {
                         </div>
 
                         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                            <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.triple.step3')}</div>
+                            <div style={{ fontWeight: 700, marginBottom: 6 }}>{t('planner.triple.step3')}</div>
 
                             <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
                                 <button
@@ -8436,7 +8455,7 @@ export default function App() {
                                         background: isEditMode ? "rgba(255,255,255,0.12)" : "transparent",
                                         color: "#e8eefc",
                                         cursor: isRoutingTriple ? "not-allowed" : "pointer",
-                                        fontWeight: 900,
+                                        fontWeight: 700,
                                         opacity: isRoutingTriple ? 0.7 : 1,
                                     }}
                                     title={t('planner.triple.editRouteTip')}
@@ -8455,7 +8474,7 @@ export default function App() {
                                         background: "transparent",
                                         color: "#e8eefc",
                                         cursor: !isEditMode ? "not-allowed" : "pointer",
-                                        fontWeight: 900,
+                                        fontWeight: 700,
                                         opacity: !isEditMode ? 0.6 : 1,
                                     }}
                                     title={t('planner.triple.cancelChanges')}
@@ -8483,7 +8502,7 @@ export default function App() {
                                                 background: "transparent",
                                                 color: "#e8eefc",
                                                 cursor: editHistPos <= 0 ? "not-allowed" : "pointer",
-                                                fontWeight: 900,
+                                                fontWeight: 700,
                                                 opacity: editHistPos <= 0 ? 0.55 : 1,
                                             }}
                                             title={t('planner.triple.undo')}
@@ -8502,7 +8521,7 @@ export default function App() {
                                                 background: "transparent",
                                                 color: "#e8eefc",
                                                 cursor: editHistPos >= editHistory.length - 1 ? "not-allowed" : "pointer",
-                                                fontWeight: 900,
+                                                fontWeight: 700,
                                                 opacity: editHistPos >= editHistory.length - 1 ? 0.55 : 1,
                                             }}
                                             title={t('planner.triple.redo')}
@@ -8517,7 +8536,7 @@ export default function App() {
 
 
                         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                            <div style={{ fontWeight: 900, marginBottom: 4 }}>{t('planner.triple.step4')}</div>
+                            <div style={{ fontWeight: 700, marginBottom: 4 }}>{t('planner.triple.step4')}</div>
                             <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 12, lineHeight: 1.4 }}>
                                 {t('planner.edit.desc')}
                                 <br />
@@ -8570,7 +8589,7 @@ export default function App() {
                                                             display: "flex", alignItems: "center", justifyContent: "center",
                                                             color: "black", fontSize: 9, fontWeight: "bold", lineHeight: 1,
                                                             fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif"
-                                                        }}>₪</div>
+                                                        }}>$</div>
                                                     </div>
                                                 )}
 
@@ -8752,7 +8771,7 @@ export default function App() {
                         <div>
 
                             <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                                <div style={{ fontWeight: 900, marginBottom: 8 }}>{t('planner.triple.step5')}</div>
+                                <div style={{ fontWeight: 700, marginBottom: 8 }}>{t('planner.triple.step5')}</div>
 
                                 <div style={{ fontSize: 13, opacity: 0.92, lineHeight: 1.45 }}>
                                     {t('planner.task.desc')}
@@ -9029,14 +9048,14 @@ export default function App() {
                                         transition: "all 0.2s"
                                     }}
                                 >
-                                    ✨ בצע איזון ופיזור ישויות
+                                    {t('planner.actions.scatterBtn')}
                                 </button>
                             </div>
                             {/* --- שלב 6: תוצאות והמלצה (מעודכן) --- */}
                             <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 20 }}>
-                                <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.triple.step6')}</div>
+                                <div style={{ fontWeight: 700, marginBottom: 6 }}>{t('planner.triple.step6')}</div>
                                 <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 12 }}>
-                                    לחץ לחשיפת נתונים. כל שינוי במפה יאפס את התוצאות.
+                                    {t('planner.actions.revealData')}
                                 </div>
 
                                 <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
@@ -9070,7 +9089,7 @@ export default function App() {
                                             background: showResults ? "rgba(34, 197, 94, 0.2)" : "rgba(255,255,255,0.06)",
                                             color: showResults ? "#4ade80" : "#e8eefc",
                                             cursor: tripleComputed ? "pointer" : "not-allowed",
-                                            fontWeight: 900,
+                                            fontWeight: 700,
                                             fontSize: 14,
                                             transition: "all 0.2s"
                                         }}
@@ -9108,7 +9127,7 @@ export default function App() {
                                             background: "rgba(255,255,255,0.04)",
                                             color: "#e8eefc",
                                             cursor: tripleComputed ? "pointer" : "not-allowed",
-                                            fontWeight: 900,
+                                            fontWeight: 700,
                                             fontSize: 14,
                                             opacity: tripleComputed ? 1 : 0.5
                                         }}
@@ -9126,7 +9145,7 @@ export default function App() {
                                         marginBottom: 12,
                                         animation: "fadeIn 0.5s ease-out"
                                     }}>
-                                        <div style={{ fontWeight: 900, color: "#4ade80", fontSize: 14, marginBottom: 2 }}>
+                                        <div style={{ fontWeight: 700, color: "#4ade80", fontSize: 14, marginBottom: 2 }}>
                                             {t('planner.results.recommendation').replace('{route}', isRtl ? (taskWinnerRoute === 'A' ? 'א' : taskWinnerRoute === 'B' ? 'ב' : 'ג') : taskWinnerRoute ?? '')}
                                         </div>
                                         <div style={{ fontSize: 11, opacity: 0.8 }}>
@@ -9211,7 +9230,7 @@ export default function App() {
                                     onMouseDown={(e) => e.stopPropagation()}
                                 >
                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
-                                        <div style={{ fontWeight: 900, fontSize: 16 }}>{t('planner.edit.modalTitle')}</div>
+                                        <div style={{ fontWeight: 700, fontSize: 16 }}>{t('planner.edit.modalTitle')}</div>
                                         <button
                                             onClick={() => setShowCatSettings(false)}
                                             style={{
@@ -9221,7 +9240,7 @@ export default function App() {
                                                 borderRadius: 10,
                                                 padding: "8px 10px",
                                                 cursor: "pointer",
-                                                fontWeight: 900,
+                                                fontWeight: 700,
                                             }}
                                             title="סגור"
                                         >
@@ -9261,7 +9280,7 @@ export default function App() {
                                                 color: "#e8eefc",
                                                 cursor: tripleComputed ? "pointer" : "not-allowed",
                                                 textAlign: "right",
-                                                fontWeight: 900,
+                                                fontWeight: 700,
                                             }}
                                             title={!tripleComputed ? "יש לחשב מסלולים לפני יצירת פארקים ידניים" : isDrawingPark ? "מצב ציור פעיל (דאבל קליק לסגירה, ESC לביטול)" : "הוסף פוליגון פארק ידני"}
                                         >
@@ -9281,7 +9300,7 @@ export default function App() {
                                                 color: "#e8eefc",
                                                 cursor: manualParks.length === 0 && draftParkPts.length === 0 ? "not-allowed" : "pointer",
                                                 textAlign: "right",
-                                                fontWeight: 900,
+                                                fontWeight: 700,
                                             }}
                                         >
                                             {t('planner.categories.clearParks')}
@@ -9301,12 +9320,12 @@ export default function App() {
 
                 {mode === "SINGLE" && (
                     <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                        <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.mode.single')}</div>
+                        <div style={{ fontWeight: 700, marginBottom: 6 }}>{t('planner.mode.single')}</div>
                         <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10 }}>
                             {t('planner.mode.singleInstructions')}
                         </div>
 
-                        {isRoutingSingle && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 900 }}>{t('planner.mode.singleComputing')}</div>}
+                        {isRoutingSingle && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700 }}>{t('planner.mode.singleComputing')}</div>}
 
                         <div style={{ marginTop: 10, fontSize: 13 }}>
                             Waypoints: <b>{singleWaypoints.length}</b>
@@ -9326,7 +9345,7 @@ export default function App() {
                                 background: "transparent",
                                 color: "#e8eefc",
                                 cursor: "pointer",
-                                fontWeight: 900,
+                                fontWeight: 700,
                             }}
                         >
                             {t('planner.mode.singleClearBtn')}
@@ -9336,7 +9355,7 @@ export default function App() {
 
                 {mode === "MEASURE" && (
                     <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                        <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.mode.measure')}</div>
+                        <div style={{ fontWeight: 700, marginBottom: 6 }}>{t('planner.mode.measure')}</div>
                         <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10 }}>{t('planner.mode.measureTip')}</div>
 
                         <div style={{ fontSize: 13 }}>
@@ -9357,7 +9376,7 @@ export default function App() {
                                 background: "transparent",
                                 color: "#e8eefc",
                                 cursor: "pointer",
-                                fontWeight: 900,
+                                fontWeight: 700,
                             }}
                         >
                             {t('planner.mode.measureClearBtn')}
@@ -9367,7 +9386,7 @@ export default function App() {
 
                 {/* Export participant screen */}
                 <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                    <div style={{ fontWeight: 900, marginBottom: 6 }}>{t('planner.export.title')}</div>
+                    <div style={{ fontWeight: 700, marginBottom: 6 }}>{t('planner.export.title')}</div>
                     <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10, lineHeight: 1.45 }}>
                         {t('planner.export.exportDesc')}
                     </div>
@@ -9386,7 +9405,7 @@ export default function App() {
                             background: "rgba(140,203,255,0.18)",
                             color: "#e8eefc",
                             cursor: "pointer",
-                            fontWeight: 900,
+                            fontWeight: 700,
                             textAlign: "center",
                             fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
                         }}
@@ -9426,12 +9445,12 @@ export default function App() {
                                 border: "1px solid rgba(255,255,255,0.14)",
                                 borderRadius: 16,
                                 padding: 14,
-                                direction: "rtl",
+                                direction: dir,
                             }}
                             onMouseDown={(e) => e.stopPropagation()}
                         >
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-                                <div style={{ fontWeight: 900, fontSize: 16 }}>{t('planner.export.participantTitle')}</div>
+                                <div style={{ fontWeight: 700, fontSize: 16 }}>{t('planner.export.participantTitle')}</div>
                                 <button
                                     onClick={() => setExportOpen(false)}
                                     style={{
@@ -9441,7 +9460,7 @@ export default function App() {
                                         background: "rgba(255,255,255,0.06)",
                                         color: "#e8eefc",
                                         cursor: "pointer",
-                                        fontWeight: 900,
+                                        fontWeight: 700,
                                     }}
                                 >
                                     {t('planner.results.close')}
@@ -9596,9 +9615,9 @@ export default function App() {
                                             }}
                                         >
                                             {/* שינוי 2: הוספת עיצוב לאפשרויות כדי שהרקע יהיה כהה כשהרשימה נפתחת */}
-                                            <option value="A" style={{ background: "#1e293b", color: "#e8eefc" }}>מסלול א</option>
-                                            <option value="B" style={{ background: "#1e293b", color: "#e8eefc" }}>מסלול ב</option>
-                                            <option value="C" style={{ background: "#1e293b", color: "#e8eefc" }}>מסלול ג</option>
+                                            <option value="A" style={{ background: "#1e293b", color: "#e8eefc" }}>{t('planner.triple.routeA')}</option>
+                                            <option value="B" style={{ background: "#1e293b", color: "#e8eefc" }}>{t('planner.triple.routeB')}</option>
+                                            <option value="C" style={{ background: "#1e293b", color: "#e8eefc" }}>{t('planner.triple.routeC')}</option>
                                         </select>
                                     </div>
                                 </div>
@@ -9645,7 +9664,7 @@ export default function App() {
                                                     background: "rgba(255,255,255,0.06)",
                                                     color: "#e8eefc",
                                                     cursor: "pointer",
-                                                    fontWeight: 900,
+                                                    fontWeight: 700,
                                                     fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
                                                 }}
                                             >
@@ -9661,7 +9680,7 @@ export default function App() {
                                                     background: "transparent",
                                                     color: "#e8eefc",
                                                     cursor: "pointer",
-                                                    fontWeight: 900,
+                                                    fontWeight: 700,
                                                     fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
                                                 }}
                                             >
@@ -9684,7 +9703,7 @@ export default function App() {
                                             flex: 1, minWidth: 180, padding: "10px 12px", borderRadius: 12,
                                             border: "1px solid rgba(255,255,255,0.18)",
                                             background: "rgba(140,203,255,0.18)",
-                                            color: "#e8eefc", cursor: "pointer", fontWeight: 900, fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif"
+                                            color: "#e8eefc", cursor: "pointer", fontWeight: 700, fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif"
                                         }}
                                     >
                                         {t('planner.export.exportHtml')}
@@ -9700,7 +9719,7 @@ export default function App() {
                                             background: tripleComputed ? "rgba(34, 197, 94, 0.2)" : "rgba(255,255,255,0.05)",
                                             color: tripleComputed ? "#4ade80" : "rgba(255,255,255,0.4)",
                                             cursor: tripleComputed ? "pointer" : "not-allowed",
-                                            fontWeight: 900, fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+                                            fontWeight: 700, fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
                                             display: "flex", alignItems: "center", justifyContent: "center", gap: 6
                                         }}
                                         title="שמירת קובץ עבודה מלא לעריכה עתידית"
@@ -9720,7 +9739,7 @@ export default function App() {
                                             flex: 0.5, minWidth: 100, padding: "10px 12px", borderRadius: 12,
                                             border: "1px solid rgba(255,255,255,0.18)",
                                             background: "transparent",
-                                            color: "#e8eefc", cursor: "pointer", fontWeight: 900, fontFamily: "Arial, sans-serif"
+                                            color: "#e8eefc", cursor: "pointer", fontWeight: 700, fontFamily: "Arial, sans-serif"
                                         }}
                                     >
                                         {t('planner.export.cancel')}
@@ -9771,7 +9790,7 @@ export default function App() {
                     </div>
                 )}
 
-                <div style={{ fontSize: 12, opacity: 0.65 }}>טיפ: בחר מסלול א/ב/ג בפאנל כדי להציג עליו את חלוקת המקטעים.</div>
+                <div style={{ fontSize: 12, opacity: 0.65 }}>{t('planner.triple.segmentPickerTip')}</div>
 
                 
 

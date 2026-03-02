@@ -29,7 +29,7 @@
     "panel": {
       "title": "Scenario Planning",
       "jsonExport": "JSON ⇩",
-      "loadScenario": "📂 Load Scenario",
+      "loadScenario": "Load SCN",
       "lastSaved": "Last saved:"
     },
     "mapData": {
@@ -45,9 +45,9 @@
       "transit": "Transit",
       "labels": "Labels",
       "poi": "Points of Interest",
-      "trafficLayer": "[??] Traffic",
+      "trafficLayer": "Traffic",
       "tollRoads": "Toll Roads",
-      "goodComms": "[??] Good Coverage",
+      "goodComms": "Communication Zones",
       "baseParks": "Base Parks",
       "manualParks": "Manual Parks",
       "baseLayers": "Base Layers",
@@ -62,7 +62,7 @@
       "measure": "Measurement",
       "statusLabel": "Selection Status:",
       "statusActive": "Active",
-      "statusWaiting": "[??] Waiting",
+      "statusWaiting": "Waiting",
       "statusHint": "(1st click = origin, 2nd = destination)",
       "singleComputing": "Computing route…",
       "singleClearBtn": "Clear Single Route",
@@ -71,7 +71,9 @@
       "measureTip": "Clicks add measurement points (geodesic calculation).",
       "measureClearBtn": "Clear Measurement",
       "measureDistance": "Distance:",
-      "measurePoints": "Points:"
+      "measurePoints": "Points:",
+      "dragTip": "After computing you can drag flags (A/B/C) to see live updates.",
+      "clearBtn": "Clear 🗑️"
     },
     "triple": {
       "step1": "Step 1: Parameters & Calculation",
@@ -80,7 +82,7 @@
       "step4": "Step 4: Manual Entity Editing",
       "step5": "Step 5: Define Task & Compute Optimal Route",
       "step6": "Step 6: Results & Recommendation",
-      "diversity": "[??] Diversity",
+      "diversity": "Variance",
       "targetTimeGap": "Target Time Gap (min)",
       "selectRoute": "Select Route",
       "routePickerTitle": "Route Selection",
@@ -94,16 +96,17 @@
       "endEdit": "End Editing",
       "cancelChanges": "Cancel all changes and revert to system solution",
       "undo": "Undo",
-      "redo": "Redo"
+      "redo": "Redo",
+      "segmentPickerTip": "Tip: Select route A/B/C in the panel to display segment breakdown on it."
     },
     "categories": {
-      "traffic": "[??] Traffic",
+      "traffic": "Traffic",
       "toll": "Toll Roads",
-      "comm": "[??] Coverage",
+      "comm": "Communication Zones",
       "parks": "Parks",
       "add": "Add",
       "finish": "Finish",
-      "pick": "[??] Hatch",
+      "pick": "Pinpoint",
       "cancel": "Cancel",
       "delete": "Delete",
       "active": "Active",
@@ -121,7 +124,9 @@
       "hideData": "Hide Data",
       "calculate": "Calculate Routes",
       "calculating": "Calculating…",
-      "clearAll": "Clear all routes / measurement"
+      "clearAll": "Clear all routes / measurement",
+      "scatterBtn": "✨ Run Entity Balancing & Distribution",
+      "revealData": "Click to reveal data. Any map change will reset results."
     },
     "results": {
       "title": "Results",
@@ -131,11 +136,11 @@
       "length": "Length (km)",
       "time": "Time (min)",
       "speed": "Speed",
-      "economy": "[??] Savings",
-      "scenic": "[??] Scenic",
-      "reception": "[??] Reception",
-      "weight": "[??] Weight",
-      "weighted": "[??] Weighted Score",
+      "economy": "Economic",
+      "scenic": "Scenic",
+      "reception": "Commu",
+      "weight": "Weight",
+      "weighted": "Weighted Score",
       "route": "Route",
       "total": "Total",
       "km": "km",
@@ -143,7 +148,12 @@
       "score": "Score",
       "vizBtn": "📊 Charts",
       "recommendation": "🏆 Recommendation: Route {route}",
-      "detailHint": "For full detail, click \"Export CSV\" in the header."
+      "detailHint": "For full detail, click \"Export CSV\" in the header.",
+      "winnerNote": "🏆 Route {route} is recommended (score: {score})",
+      "winnerNoteWithRunner": "🏆 Route {route} is recommended (score: {score}). Runner-up: Route {runner} ({runnerScore}).",
+      "winnerWarning": "⚠️ No route passed the {threshold} threshold. Recommended: Route {route} ({score}).",
+      "winnerTie": "🤝 Tie: Routes {routes}. Winner by time savings: Route {route}.",
+      "winnerPreferred": "📌 Preferred route: {preferred}. Highest score: {route} ({score})."
     },
     "export": {
       "title": "Export Data",
@@ -165,14 +175,15 @@
       "cancel": "Cancel",
       "participantTitle": "Export Participant Screen",
       "exportDesc": "Create a standalone HTML file to present the scenario to the participant (map + route selection + segment details).",
-      "pathNote": "Note: Many browsers cannot read the full folder path. Files will download normally."
+      "pathNote": "Note: Many browsers cannot read the full folder path. Files will download normally.",
+      "mapDescText": "The map shows {count} routes between {origin} and {destination}."
     },
     "legend": {
       "title": "Legend",
-      "traffic": "[??] Traffic",
+      "traffic": "Traffic",
       "toll": "Toll Road",
-      "comm": "[??] Coverage",
-      "scenic": "[??] Scenic (Parks)"
+      "comm": "Communication",
+      "scenic": "Scenic (Parks)"
     },
     "viz": {
       "modal": {
@@ -190,10 +201,14 @@
         "heatmap": "Heatmap"
       },
       "segment": "Segment",
-      "speed": { "label": "Speed", "desc": "[??] Minimal Traffic" },
-      "economy": { "label": "[??] Savings", "desc": "[??] Minimal Toll Roads" },
-      "scenic": { "label": "[??] Scenic", "desc": "[??] Near Parks" },
-      "comm": { "label": "[??] Reception", "desc": "[??] Enhanced Coverage Zones" }
+      "subtitleStacked": "(Routes × Categories)",
+      "subtitleBars": "(Rows=Routes, Columns=Categories)",
+      "subtitleRadar": "(Axes=Categories, Areas=Routes)",
+      "subtitleHeatmap": "(Rows=Categories, Columns=Routes)",
+      "speed": { "label": "Speed", "desc": "Minimal Traffic" },
+      "economy": { "label": "Economic", "desc": "Minimal Toll Roads" },
+      "scenic": { "label": "Scenic", "desc": "Passing Near Parks" },
+      "comm": { "label": "Communication", "desc": "Enhanced Communication Zones" }
     },
     "edit": {
       "title": "Manual Entity Editing",
@@ -223,13 +238,13 @@
       "timeWeight": "Time Weight",
       "preferredRoute": "Preferred Route (Optional)",
       "catFast": "Fast",
-      "catEconomy": "[??] Economical",
-      "catScenic": "[??] Scenic",
+      "catEconomy": "Economic",
+      "catScenic": "Scenic",
       "catComm": "Connected"
     },
     "automation": {
       "title": "Automation & Route Balancing",
-      "density": "[??] Disturbance Quantity (Density)",
+      "density": "Disturbance Quantity (Density)",
       "timeGap": "Desired Time Gap Between Routes",
       "timeGapNote": "minutes. (Low = routes similar in time, harder to decide)"
     },
@@ -337,11 +352,11 @@
     "mapLegend": "Map Legend",
     "route": "Route",
     "selectedRoute": "Selected Route",
-    "traffic": "[??] Traffic",
+    "traffic": "Traffic",
     "toll": "Toll",
-    "comm": "[??] Coverage",
+    "comm": "Communication",
     "park": "Park",
-    "task": "[??] Task",
+    "task": "Task",
     "taskInstruction": "If more than one route meets the requirements, prefer the route with the shortest total travel time.",
     "selectTip": "💡 You can select a route by clicking the line on the map or in the segment time graph.",
     "estimatedTime": "Estimated task time:",
@@ -361,16 +376,18 @@
     "centerMap": "Center Map",
     "zoomOut": "Zoom Out",
     "layers": "Layers",
-    "origin": "[??] Origin",
+    "origin": "Origin",
     "destination": "Destination",
     "noData": "No Data",
     "segment": "Segment",
     "minutes": "min",
     "vizLegend": "Visualization Legend",
     "segmentTimes": "Segment Times",
-    "speed": { "label": "Speed", "desc": "[??] Minimal Traffic" },
-    "economy": { "label": "[??] Savings", "desc": "[??] Minimal Toll Roads" },
-    "scenic": { "label": "[??] Scenic", "desc": "[??] Near Parks" },
-    "commScore": { "label": "[??] Reception", "desc": "[??] Enhanced Coverage Zones" }
+    "speed": { "label": "Speed", "desc": "Minimal Traffic" },
+    "economy": { "label": "Economical", "desc": "Minimal Toll Roads" },
+    "scenic": { "label": "Scenic", "desc": "Passing Near Parks" },
+    "commScore": { "label": "Communication", "desc": "Enhanced Communication Zones" },
+    "mapDesc": "The map shows {count} routes between {origin} and {destination}.",
+    "requirementsHint": "Requirements defined for this scenario."
   }
 }
