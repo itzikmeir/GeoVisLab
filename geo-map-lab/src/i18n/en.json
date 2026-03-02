@@ -73,7 +73,8 @@
       "measureDistance": "Distance:",
       "measurePoints": "Points:",
       "dragTip": "After computing you can drag flags (A/B/C) to see live updates.",
-      "clearBtn": "Clear 🗑️"
+      "clearBtn": "Clear 🗑️",
+      "pointsSelected": "✓ Points selected."
     },
     "triple": {
       "step1": "Step 1: Parameters & Calculation",
@@ -176,7 +177,9 @@
       "participantTitle": "Export Participant Screen",
       "exportDesc": "Create a standalone HTML file to present the scenario to the participant (map + route selection + segment details).",
       "pathNote": "Note: Many browsers cannot read the full folder path. Files will download normally.",
-      "mapDescText": "The map shows {count} routes between {origin} and {destination}."
+      "mapDescText": "The map shows {count} routes between {origin} and {destination}.",
+      "defaultTaskText": "The map shows 3 possible routes between the origin and destination. Select and confirm the route that best meets the requirements.",
+      "requirementsPlaceholder": "Write additional requirements / instructions here. They will appear in the exported file below the task text (bold)."
     },
     "legend": {
       "title": "Legend",
@@ -208,7 +211,7 @@
       "speed": { "label": "Speed", "desc": "Minimal Traffic" },
       "economy": { "label": "Economic", "desc": "Minimal Toll Roads" },
       "scenic": { "label": "Scenic", "desc": "Passing Near Parks" },
-      "comm": { "label": "Communication", "desc": "Enhanced Communication Zones" }
+      "comm": { "label": "Communication", "desc": "Communication Zones" }
     },
     "edit": {
       "title": "Manual Entity Editing",
@@ -384,9 +387,9 @@
     "vizLegend": "Visualization Legend",
     "segmentTimes": "Segment Times",
     "speed": { "label": "Speed", "desc": "Minimal Traffic" },
-    "economy": { "label": "Economical", "desc": "Minimal Toll Roads" },
+    "economy": { "label": "Eco", "desc": "Minimal Toll Roads" },
     "scenic": { "label": "Scenic", "desc": "Passing Near Parks" },
-    "commScore": { "label": "Communication", "desc": "Enhanced Communication Zones" },
+    "commScore": { "label": "Comm", "desc": "Communication Zones" },
     "mapDesc": "The map shows {count} routes between {origin} and {destination}.",
     "requirementsHint": "Requirements defined for this scenario."
   }

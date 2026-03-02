@@ -130,6 +130,10 @@ function buildParticipantHtml(args: {
     top: 0;
     transition: width 0.1s linear, background-color 0.5s;
 }
+[dir="ltr"] #progressBar {
+    left: auto;
+    right: 0; /* LTR: anchored right, shrinks from left */
+}
 
 /* אחידות גודל טקסט לויזואליזציות כפי שביקשת */
 .stack-label, .heatmap-cell, .radar-chart text {
@@ -464,7 +468,7 @@ function buildParticipantHtml(args: {
              <div style="position:absolute; top:0; width:100%; height:2px; background:#FFE100"></div>
              <div style="position:absolute; bottom:0; width:100%; height:2px; background:#FFE100"></div>
              
-             <div style="width:14px; height:14px; background:#FFE100; border:1px solid rgba(0,0,0,0.7); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#000; position:absolute; z-index:5; font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif;">$</div>
+             <div style="width:14px; height:14px; background:#FFE100; border:1px solid rgba(0,0,0,0.7); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#000; position:absolute; z-index:5; top:50%; left:50%; transform:translate(-50%,-50%); font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif;">$</div>
            </div>
            <span>${args.strings.toll ?? 'אגרה'}</span>
         </div>
@@ -476,7 +480,6 @@ function buildParticipantHtml(args: {
     <div class="taskPanel panel">
       <div class="h">${args.strings.task ?? 'מטלה'}</div>
       <div class="muted" id="taskText"></div>
-    <div class="muted" id="requirementsText" style="font-weight:900; margin-top:8px; display:none; font-size:24px; font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif !important"></div>
     <div class="muted" id="requirementsText" style="font-weight:900; margin-top:8px; display:none; font-size:24px; font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif !important"></div>
       <div class="small-note">${args.strings.taskInstruction ?? 'אם יש יותר ממסלול אחד שעומד בדרישות, יש להעדיף את המסלול עם זמן הנסיעה הכולל הקצר מבינהם.'}</div>
       <div class="sep"></div>
@@ -1311,12 +1314,11 @@ const exportParticipantHtml = useCallback(async () => {
             scenarioName: exportScenarioName,
             taskText: exportTaskText,
             requirementsText: exportRequirementsText,
-            requirementsText: exportRequirementsText,
             recommendedRoute: exportRecommendedRoute,
             vizType: exportVizType,
             baseMapDataUrl,
-            mapView: { 
-                width: w, 
+            mapView: {
+                width: w,
                 height: h, 
                 zoom: zoom, 
                 center: [center.lng, center.lat] 
@@ -4933,9 +4935,17 @@ export default function App() {
         const ymd = d.toISOString().slice(0, 10);
         return `Scenario_${ymd}_${Date.now()}`;
     });
+    const EXPORT_TASK_DEFAULTS = [
+        "במפה שלפניך מופיעים 3 מסלולים אפשריים בין נקודת המוצא ליעד. בחר ואשר את המסלול שמתעדף את הדרישות",
+        "The map shows 3 possible routes between the origin and destination. Select and confirm the route that best meets the requirements.",
+    ];
     const [exportTaskText, setExportTaskText] = useState(
        "במפה שלפניך מופיעים 3 מסלולים אפשריים בין נקודת המוצא ליעד. בחר ואשר את המסלול שמתעדף את הדרישות"
     );
+    useEffect(() => {
+        setExportTaskText(prev => EXPORT_TASK_DEFAULTS.includes(prev) ? t('planner.export.defaultTaskText') : prev);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [uiLang]);
     const [exportRequirementsText, setExportRequirementsText] = useState<string>("");
     // State עבור בחירת סוגי הויזואליזציה (Multi-select)
  
@@ -6081,8 +6091,14 @@ export default function App() {
     // Apply language when changed
     useEffect(() => {
         const map = mapRef.current;
-        if (!map || !map.isStyleLoaded()) return;
+        if (!map) return;
         applyLanguage(map, lang, originalTextFieldRef);
+        // If style not yet loaded, retry once it is
+        if (!map.isStyleLoaded()) {
+            const onIdle = () => applyLanguage(map, lang, originalTextFieldRef);
+            map.once('idle', onIdle);
+            return () => { map.off('idle', onIdle); };
+        }
     }, [lang]);
 
     // Apply layer toggles when changed
@@ -7683,29 +7699,17 @@ export default function App() {
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
-                        <div style={{ width: 34, height: 10, position: "relative" }}>
-                            <div style={{ position: "absolute", left: 0, right: 0, top: 1, borderTop: `3px solid ${CAT_TOLL_COLOR}` }} />
-                            <div style={{ position: "absolute", left: 0, right: 0, bottom: 1, borderTop: `3px solid ${CAT_TOLL_COLOR}` }} />
+                        <div style={{ width: 34, height: 14, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <div style={{ position: "absolute", left: 0, right: 0, top: 2, borderTop: `3px solid ${CAT_TOLL_COLOR}` }} />
+                            <div style={{ position: "absolute", left: 0, right: 0, bottom: 2, borderTop: `3px solid ${CAT_TOLL_COLOR}` }} />
+                            <span style={{
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                width: 14, height: 14, borderRadius: 999,
+                                background: CAT_TOLL_COLOR, border: "1px solid rgba(11,18,32,0.9)",
+                                color: "#0b1220", fontWeight: 700, fontSize: 9, position: "relative", zIndex: 1,
+                            }}>$</span>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ fontWeight: 700 }}>{t('planner.legend.toll')}</span>
-                            <span
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    width: 18,
-                                    height: 18,
-                                    borderRadius: 999,
-                                    background: CAT_TOLL_COLOR,
-                                    border: "1px solid rgba(11,18,32,0.9)",
-                                    color: "#0b1220",
-                                    fontWeight: 700,
-                                }}
-                            >
-                                $
-                            </span>
-                        </div>
+                        <div style={{ fontWeight: 700 }}>{t('planner.legend.toll')}</div>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
@@ -8294,7 +8298,7 @@ export default function App() {
                         {mode === "TRIPLE" && (
                             <div style={{ fontSize: 13, opacity: 0.9 }}>
                                 {t('planner.mode.statusLabel')} <b>{triplePickArmed ? t('planner.mode.statusActive') : t('planner.mode.statusWaiting')}</b> {t('planner.mode.statusHint')}
-                                {start && end && <div style={{ color: "#4ade80", fontWeight: 700, marginTop: 4 }}>✓ נבחרו נקודות.</div>}
+                                {start && end && <div style={{ color: "#4ade80", fontWeight: 700, marginTop: 4 }}>{t('planner.mode.pointsSelected')}</div>}
                             </div>
                         )}
                         {mode === "SINGLE" && (
@@ -9519,7 +9523,7 @@ export default function App() {
                                         value={exportRequirementsText}
                                         onChange={(e) => setExportRequirementsText(e.target.value)}
                                         rows={3}
-                                        placeholder="כתוב כאן דרישות/הנחיות נוספות שיופיעו בקובץ המיוצא מתחת לטקסט המטלה (מודגש)"
+                                        placeholder={t('planner.export.requirementsPlaceholder')}
                                         style={{
                                             width: "96%",
                                             padding: "10px 12px",
