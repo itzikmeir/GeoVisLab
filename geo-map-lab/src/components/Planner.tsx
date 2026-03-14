@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useLanguage } from '../i18n/index.tsx';
+import { EntityLibraryModal, loadEntityLibrary, BUILTIN_TRAFFIC_ID, BUILTIN_TOLL_ID, BUILTIN_COMM_ID, BUILTIN_PARK_ID, type EntityLibrary, type EntityTypeDef, type EntityInstance } from './EntityLibraryModal';
 
 // ---- Export screen (participant) helpers ----
 declare global {
@@ -4966,6 +4967,8 @@ export default function App() {
     // Right-panel helpers
     const [showLayerManager, setShowLayerManager] = useState(false);
     const [showCatSettings, setShowCatSettings] = useState(false);
+    const [showEntityLibrary, setShowEntityLibrary] = useState(false);
+    const [entityLibrary, setEntityLibrary] = useState<EntityLibrary>(() => loadEntityLibrary());
 
     const [manualParks, setManualParks] = useState<ManualPark[]>([]);
     const manualParksRef = useRef<ManualPark[]>([]);
@@ -5005,6 +5008,34 @@ export default function App() {
     const draftParkPtsRef = useRef<LngLat[]>([]);
     useEffect(() => { draftParkPtsRef.current = draftParkPts; }, [draftParkPts]);
     const draftMouseRef = useRef<LngLat | null>(null);
+
+    // ── יישויות מותאמות מהספריה ── (persistent)
+    const [activeEntityTypeIds, setActiveEntityTypeIds] = useState<string[]>(() => {
+        try { const r = localStorage.getItem('geovislab_active_entities'); if (r) return JSON.parse(r) as string[]; } catch {}
+        return [];
+    });
+    const [customEntityInstances, setCustomEntityInstances] = useState<Record<string, EntityInstance[]>>(() => {
+        try { const r = localStorage.getItem('geovislab_entity_instances'); if (r) return JSON.parse(r) as Record<string, EntityInstance[]>; } catch {}
+        return {};
+    });
+    const [customEntityVisibility, setCustomEntityVisibility] = useState<Record<string, boolean>>({});
+    const [customDrawTypeId, setCustomDrawTypeId] = useState<string | null>(null);
+    const customDrawTypeIdRef = useRef<string | null>(null);
+    useEffect(() => { customDrawTypeIdRef.current = customDrawTypeId; }, [customDrawTypeId]);
+    const [customDeleteTypeId, setCustomDeleteTypeId] = useState<string | null>(null);
+    const customDeleteTypeIdRef = useRef<string | null>(null);
+    useEffect(() => { customDeleteTypeIdRef.current = customDeleteTypeId; }, [customDeleteTypeId]);
+    const [customDraftPts, setCustomDraftPts] = useState<LngLat[]>([]);
+    const customDraftPtsRef = useRef<LngLat[]>([]);
+    useEffect(() => { customDraftPtsRef.current = customDraftPts; }, [customDraftPts]);
+    const [customDraftCenter, setCustomDraftCenter] = useState<LngLat | null>(null);
+    const customDraftCenterRef = useRef<LngLat | null>(null);
+    useEffect(() => { customDraftCenterRef.current = customDraftCenter; }, [customDraftCenter]);
+    const entityLibraryRef = useRef<EntityLibrary>(entityLibrary);
+    useEffect(() => { entityLibraryRef.current = entityLibrary; }, [entityLibrary]);
+    // שמור activeEntityTypeIds ו-customEntityInstances ב-localStorage
+    useEffect(() => { localStorage.setItem('geovislab_active_entities', JSON.stringify(activeEntityTypeIds)); }, [activeEntityTypeIds]);
+    useEffect(() => { localStorage.setItem('geovislab_entity_instances', JSON.stringify(customEntityInstances)); }, [customEntityInstances]);
 
     // Keep manual parks geojson in sync
     useEffect(() => {
@@ -5996,6 +6027,101 @@ export default function App() {
                 return;
             }
 
+            // ── מחיקת מופע יישות מותאמת ──
+            const delCustomId = customDeleteTypeIdRef.current;
+            if (delCustomId) {
+                const srcId = `custom-ent-${delCustomId}`;
+                const layerIds = [`${srcId}-fill`, `${srcId}-line`, `${srcId}-circle`, `${srcId}-label`, `${srcId}-casing`]
+                    .filter(lid => { try { return !!map.getLayer(lid); } catch { return false; } });
+                const feats = layerIds.length > 0
+                    ? map.queryRenderedFeatures(ev.point, { layers: layerIds }) as any[]
+                    : [];
+                if (feats.length > 0) {
+                    const fid = feats[0].properties?.id as string | undefined;
+                    if (fid) {
+                        setCustomEntityInstances(prev => ({
+                            ...prev,
+                            [delCustomId]: (prev[delCustomId] || []).filter(inst => inst.id !== fid),
+                        }));
+                    }
+                }
+                return;
+            }
+
+            // ── ציור יישות מותאמת מהספריה ──
+            const customTypeId = customDrawTypeIdRef.current;
+            if (customTypeId) {
+                const typeDef = entityLibraryRef.current.entities.find(e => e.id === customTypeId);
+                if (!typeDef) { setCustomDrawTypeId(null); return; }
+
+                if (typeDef.geometryType === 'point') {
+                    const id = `${customTypeId}_${Date.now()}`;
+                    setCustomEntityInstances(prev => ({
+                        ...prev,
+                        [customTypeId]: [...(prev[customTypeId] || []), { id, typeId: customTypeId, coords: [ll] }],
+                    }));
+                    // Point stays in draw mode (click multiple times to add points)
+                    return;
+                }
+
+                if (typeDef.geometryType === 'circle') {
+                    if (!customDraftCenterRef.current) {
+                        setCustomDraftCenter(ll);
+                        showToast('הקלק לקביעת הרדיוס');
+                    } else {
+                        const center = customDraftCenterRef.current;
+                        const r = haversineMeters(center, ll);
+                        if (r < 10) { showToast('הרדיוס קטן מדי (מינ׳ 10מ׳)'); return; }
+                        const ring = circleRing(center, r);
+                        const id = `${customTypeId}_${Date.now()}`;
+                        setCustomEntityInstances(prev => ({
+                            ...prev,
+                            [customTypeId]: [...(prev[customTypeId] || []), { id, typeId: customTypeId, coords: ring, radiusM: r }],
+                        }));
+                        setCustomDraftCenter(null);
+                        setCustomDrawTypeId(null);
+                    }
+                    return;
+                }
+
+                if (typeDef.geometryType === 'line') {
+                    if (typeDef.snapToRoad) {
+                        const p = ev.point;
+                        const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [[p.x - 25, p.y - 25], [p.x + 25, p.y + 25]];
+                        const feats = map.queryRenderedFeatures(bbox) as any[];
+                        let best: LngLat | null = null;
+                        let bestD = Infinity;
+                        for (const f of feats) {
+                            const geom = f.geometry;
+                            if (!geom) continue;
+                            const gt2 = geom.type;
+                            if (gt2 !== "LineString" && gt2 !== "MultiLineString") continue;
+                            const cds: any[] = gt2 === "LineString" ? geom.coordinates : (geom.coordinates || []).flat(1);
+                            for (const c of cds) {
+                                if (!Array.isArray(c) || c.length < 2) continue;
+                                const pt = map.project({ lng: c[0], lat: c[1] } as any);
+                                const dx = pt.x - p.x, dy = pt.y - p.y;
+                                const d2 = dx * dx + dy * dy;
+                                if (d2 < bestD) { bestD = d2; best = [c[0], c[1]]; }
+                            }
+                        }
+                        if (best && bestD <= 625) {
+                            setCustomDraftPts(prev => [...prev, best!]);
+                        } else {
+                            showToast(t('planner.toast.pointNotOnRoad'));
+                        }
+                    } else {
+                        setCustomDraftPts(prev => [...prev, ll]);
+                    }
+                    return;
+                }
+
+                if (typeDef.geometryType === 'polygon') {
+                    setCustomDraftPts(prev => [...prev, ll]);
+                    return;
+                }
+            }
+
             const m = modeRef.current;
 
             // ✅ Route edit mode: clicking on a junction marker toggles deletion (without affecting start/end picking)
@@ -6071,6 +6197,25 @@ export default function App() {
                 return;
             }
 
+            // סיום ציור קו/פוליגון של יישות מותאמת
+            const customTypeId2 = customDrawTypeIdRef.current;
+            if (customTypeId2) {
+                ev.preventDefault();
+                const typeDef2 = entityLibraryRef.current.entities.find(e => e.id === customTypeId2);
+                const pts2 = customDraftPtsRef.current;
+                if (typeDef2 && (typeDef2.geometryType === 'line' || typeDef2.geometryType === 'polygon') && pts2.length >= 2) {
+                    const coords2 = typeDef2.geometryType === 'polygon' ? [...pts2, pts2[0]] : pts2;
+                    const id2 = `${customTypeId2}_${Date.now()}`;
+                    setCustomEntityInstances(prev => ({
+                        ...prev,
+                        [customTypeId2]: [...(prev[customTypeId2] || []), { id: id2, typeId: customTypeId2, coords: coords2 }],
+                    }));
+                }
+                setCustomDraftPts([]);
+                if (typeDef2?.geometryType !== 'point') setCustomDrawTypeId(null);
+                return;
+            }
+
             if (!isDrawingParkRef.current) return;
             ev.preventDefault();
             try {
@@ -6087,6 +6232,148 @@ export default function App() {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // ── שכבות MapLibre לכל יישות מותאמת פעילה ──
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !map.isStyleLoaded()) return;
+
+        const lib = entityLibrary;
+
+        // Helper: MapLibre dasharray from StrokeStyle
+        const toDash = (style: string, w: number): number[] | null => {
+            if (style === 'dashed')    return [w * 4, w * 2];
+            if (style === 'dotted')    return [w, w * 2];
+            if (style === 'long-dash') return [w * 10, w * 3];
+            return null;
+        };
+
+        for (const typeId of activeEntityTypeIds) {
+            const def = lib.entities.find(e => e.id === typeId);
+            if (!def) continue;
+
+            const srcId   = `custom-ent-${typeId}`;
+            const visible = customEntityVisibility[typeId] !== false ? 'visible' : 'none';
+            const instances = customEntityInstances[typeId] || [];
+            const { visual: v, geometryType: gt } = def;
+
+            // Build GeoJSON
+            let features: object[] = [];
+            if (gt === 'point') {
+                features = instances.map(inst => ({
+                    type: 'Feature',
+                    properties: { id: inst.id, label: inst.label || def.name },
+                    geometry: { type: 'Point', coordinates: inst.coords[0] },
+                }));
+            } else if (gt === 'line') {
+                features = instances.filter(inst => inst.coords.length >= 2).map(inst => ({
+                    type: 'Feature',
+                    properties: { id: inst.id, label: inst.label || def.name },
+                    geometry: { type: 'LineString', coordinates: inst.coords },
+                }));
+            } else {
+                // polygon / circle
+                features = instances.filter(inst => inst.coords.length >= 3).map(inst => ({
+                    type: 'Feature',
+                    properties: { id: inst.id, label: inst.label || def.name },
+                    geometry: { type: 'Polygon', coordinates: [inst.coords] },
+                }));
+            }
+            const fc = { type: 'FeatureCollection', features };
+
+            // Ensure source
+            if (!map.getSource(srcId)) {
+                map.addSource(srcId, { type: 'geojson', data: fc as any });
+            } else {
+                setFC(map, srcId, fc);
+            }
+
+            // Casing (line entities only)
+            if (gt === 'line' && v.strokeCasingWidth > 0) {
+                const lid = `${srcId}-casing`;
+                if (!map.getLayer(lid)) {
+                    map.addLayer({ id: lid, type: 'line', source: srcId,
+                        layout: { 'line-cap': 'round', 'line-join': 'round' },
+                        paint: { 'line-color': v.strokeCasingColor, 'line-width': v.strokeWidth + v.strokeCasingWidth * 2, 'line-opacity': v.strokeOpacity },
+                    });
+                } else {
+                    map.setPaintProperty(lid, 'line-color', v.strokeCasingColor);
+                    map.setPaintProperty(lid, 'line-width', v.strokeWidth + v.strokeCasingWidth * 2);
+                }
+                try { map.setLayoutProperty(lid, 'visibility', visible); } catch { /* ok */ }
+            }
+
+            // Fill (polygon / circle)
+            if (gt === 'polygon' || gt === 'circle') {
+                const lid = `${srcId}-fill`;
+                if (!map.getLayer(lid)) {
+                    map.addLayer({ id: lid, type: 'fill', source: srcId,
+                        paint: { 'fill-color': v.fillColor, 'fill-opacity': v.fillOpacity },
+                    });
+                } else {
+                    map.setPaintProperty(lid, 'fill-color', v.fillColor);
+                    map.setPaintProperty(lid, 'fill-opacity', v.fillOpacity);
+                }
+                try { map.setLayoutProperty(lid, 'visibility', visible); } catch { /* ok */ }
+            }
+
+            // Stroke line (all except point)
+            if (gt !== 'point') {
+                const lid = `${srcId}-line`;
+                const dash = toDash(v.strokeStyle, v.strokeWidth);
+                if (!map.getLayer(lid)) {
+                    const paint: Record<string, unknown> = { 'line-color': v.strokeColor, 'line-width': v.strokeWidth, 'line-opacity': v.strokeOpacity };
+                    if (dash) paint['line-dasharray'] = dash;
+                    map.addLayer({ id: lid, type: 'line', source: srcId,
+                        layout: { 'line-cap': 'round', 'line-join': 'round' }, paint,
+                    });
+                } else {
+                    map.setPaintProperty(lid, 'line-color', v.strokeColor);
+                    map.setPaintProperty(lid, 'line-width', v.strokeWidth);
+                    map.setPaintProperty(lid, 'line-opacity', v.strokeOpacity);
+                }
+                try { map.setLayoutProperty(lid, 'visibility', visible); } catch { /* ok */ }
+            }
+
+            // Circle (point geometry)
+            if (gt === 'point') {
+                const lid = `${srcId}-circle`;
+                if (!map.getLayer(lid)) {
+                    map.addLayer({ id: lid, type: 'circle', source: srcId, paint: {
+                        'circle-radius': v.pointSize / 2,
+                        'circle-color': v.fillColor,
+                        'circle-stroke-color': v.strokeColor,
+                        'circle-stroke-width': v.strokeWidth,
+                        'circle-opacity': v.strokeOpacity,
+                        'circle-stroke-opacity': v.strokeOpacity,
+                    }});
+                } else {
+                    map.setPaintProperty(lid, 'circle-radius', v.pointSize / 2);
+                    map.setPaintProperty(lid, 'circle-color', v.fillColor);
+                    map.setPaintProperty(lid, 'circle-stroke-color', v.strokeColor);
+                    map.setPaintProperty(lid, 'circle-stroke-width', v.strokeWidth);
+                }
+                try { map.setLayoutProperty(lid, 'visibility', visible); } catch { /* ok */ }
+            }
+
+            // Label
+            if (v.label.enabled) {
+                const lid = `${srcId}-label`;
+                const fontStack = ['Noto Sans Regular', 'Arial Unicode MS Regular'];
+                if (!map.getLayer(lid)) {
+                    map.addLayer({ id: lid, type: 'symbol', source: srcId,
+                        layout: { 'text-field': ['get', 'label'], 'text-font': fontStack, 'text-size': v.label.fontSize, 'text-allow-overlap': false },
+                        paint: { 'text-color': v.label.color, 'text-halo-color': v.label.haloColor, 'text-halo-width': 2 },
+                    });
+                } else {
+                    map.setPaintProperty(lid, 'text-color', v.label.color);
+                    map.setPaintProperty(lid, 'text-halo-color', v.label.haloColor);
+                    try { map.setLayoutProperty(lid, 'text-size', v.label.fontSize); } catch { /* ok */ }
+                }
+                try { map.setLayoutProperty(lid, 'visibility', visible); } catch { /* ok */ }
+            }
+        }
+    }, [mapStyleTick, activeEntityTypeIds, customEntityInstances, customEntityVisibility, entityLibrary]);
 
     // Apply language when changed
     useEffect(() => {
@@ -7686,58 +7973,61 @@ export default function App() {
                 >
                     <div style={{ fontWeight: 700, marginBottom: 8, opacity: 0.95 }}>{t('planner.legend.title')}</div>
 
+                    {activeEntityTypeIds.includes(BUILTIN_TRAFFIC_ID) && (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
-                        <div
-                            style={{
-                                width: 34,
-                                height: 0,
-                                borderTop: `4px dashed ${CAT_TRAFFIC_COLOR}`,
-                                filter: "drop-shadow(0 0 2px rgba(255,0,34,0.55))",
-                            }}
-                        />
+                        <div style={{ width: 34, height: 0, borderTop: `4px dashed ${CAT_TRAFFIC_COLOR}`, filter: "drop-shadow(0 0 2px rgba(255,0,34,0.55))" }} />
                         <div style={{ fontWeight: 700 }}>{t('planner.legend.traffic')}</div>
                     </div>
+                    )}
 
+                    {activeEntityTypeIds.includes(BUILTIN_TOLL_ID) && (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
                         <div style={{ width: 34, height: 14, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <div style={{ position: "absolute", left: 0, right: 0, top: 2, borderTop: `3px solid ${CAT_TOLL_COLOR}` }} />
                             <div style={{ position: "absolute", left: 0, right: 0, bottom: 2, borderTop: `3px solid ${CAT_TOLL_COLOR}` }} />
-                            <span style={{
-                                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                                width: 14, height: 14, borderRadius: 999,
-                                background: CAT_TOLL_COLOR, border: "1px solid rgba(11,18,32,0.9)",
-                                color: "#0b1220", fontWeight: 700, fontSize: 9, position: "relative", zIndex: 1,
-                            }}>$</span>
+                            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: 999, background: CAT_TOLL_COLOR, border: "1px solid rgba(11,18,32,0.9)", color: "#0b1220", fontWeight: 700, fontSize: 9, position: "relative", zIndex: 1 }}>$</span>
                         </div>
                         <div style={{ fontWeight: 700 }}>{t('planner.legend.toll')}</div>
                     </div>
+                    )}
 
+                    {activeEntityTypeIds.includes(BUILTIN_COMM_ID) && (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
-                        <div
-                            style={{
-                                width: 18,
-                                height: 18,
-                                borderRadius: 999,
-                                background: CAT_COMM_FILL,
-                                border: `2px solid ${CAT_COMM_OUTLINE}`,
-                            }}
-                        />
+                        <div style={{ width: 18, height: 18, borderRadius: 999, background: CAT_COMM_FILL, border: `2px solid ${CAT_COMM_OUTLINE}` }} />
                         <div style={{ fontWeight: 700 }}>{t('planner.legend.comm')}</div>
                     </div>
+                    )}
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div
-                            style={{
-                                width: 18,
-                                height: 12,
-                                borderRadius: 4,
-                                background: PARK_FILL,
-                                border: `2px solid ${PARK_OUTLINE}`,
-                                opacity: PARK_OPACITY,
-                            }}
-                        />
+                    {activeEntityTypeIds.includes(BUILTIN_PARK_ID) && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+                        <div style={{ width: 18, height: 12, borderRadius: 4, background: PARK_FILL, border: `2px solid ${PARK_OUTLINE}`, opacity: PARK_OPACITY }} />
                         <div style={{ fontWeight: 700 }}>{t('planner.legend.scenic')}</div>
                     </div>
+                    )}
+
+                    {/* יישויות מותאמות מהספריה */}
+                    {activeEntityTypeIds.filter(id => !id.startsWith('builtin-')).map(typeId => {
+                        const def = entityLibrary.entities.find(e => e.id === typeId);
+                        if (!def || customEntityVisibility[typeId] === false) return null;
+                        const color = def.geometryType === 'line' ? def.visual.strokeColor : def.visual.fillColor;
+                        return (
+                            <div key={typeId} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+                                {def.geometryType === 'line' && (
+                                    <svg width="34" height="8" viewBox="0 0 34 8" style={{ flexShrink: 0 }}>
+                                        <line x1="1" y1="4" x2="33" y2="4" stroke={color} strokeWidth={Math.min(def.visual.strokeWidth, 4)}
+                                            strokeDasharray={def.visual.strokeStyle === 'dashed' ? "5 3" : def.visual.strokeStyle === 'dotted' ? "1 3" : "none"} />
+                                    </svg>
+                                )}
+                                {(def.geometryType === 'polygon' || def.geometryType === 'circle') && (
+                                    <div style={{ width: 18, height: 14, borderRadius: def.geometryType === 'circle' ? 999 : 3, background: color, opacity: def.visual.fillOpacity, border: `2px solid ${def.visual.strokeColor}`, flexShrink: 0 }} />
+                                )}
+                                {def.geometryType === 'point' && (
+                                    <div style={{ width: 14, height: 14, borderRadius: 999, background: color, border: `2px solid ${def.visual.strokeColor}`, flexShrink: 0 }} />
+                                )}
+                                <div style={{ fontWeight: 700 }}>{def.name}</div>
+                            </div>
+                        );
+                    })}
                 </div>
 
                 {showResults && (
@@ -8156,6 +8446,14 @@ export default function App() {
                     </div>
                 </div>
 
+                {/* Entity Library Modal */}
+                <EntityLibraryModal
+                    isOpen={showEntityLibrary}
+                    onClose={() => setShowEntityLibrary(false)}
+                    onLibraryChange={setEntityLibrary}
+                    dir={dir}
+                />
+
                 {/* Layer manager modal */}
                 {showLayerManager && (
                     <div
@@ -8245,6 +8543,38 @@ export default function App() {
                                     ))}
                                 </div>
                             </div>
+
+                            {/* יישויות מותאמות מהספריה */}
+                            {activeEntityTypeIds.length > 0 && (
+                                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.12)" }}>
+                                    <div style={{ fontWeight: 700, marginBottom: 8 }}>יישויות מהספריה</div>
+                                    <div style={{ display: "grid", gap: 8 }}>
+                                        {activeEntityTypeIds.map(typeId => {
+                                            const def: EntityTypeDef | undefined = entityLibrary.entities.find(e => e.id === typeId);
+                                            if (!def) return null;
+                                            const isVisible = customEntityVisibility[typeId] !== false;
+                                            const dotColor = def.geometryType === 'line' ? def.visual.strokeColor : def.visual.fillColor;
+                                            return (
+                                                <label key={typeId} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isVisible}
+                                                        onChange={e => setCustomEntityVisibility(prev => ({ ...prev, [typeId]: e.target.checked }))}
+                                                    />
+                                                    <span style={{
+                                                        display: "inline-block", width: 12, height: 12,
+                                                        borderRadius: def.geometryType === 'circle' || def.geometryType === 'point' ? "50%" : 2,
+                                                        background: dotColor, flexShrink: 0,
+                                                        border: "1px solid rgba(255,255,255,0.2)",
+                                                    }} />
+                                                    <span style={{ fontWeight: 800 }}>{def.name || '(ללא שם)'}</span>
+                                                    <span style={{ opacity: 0.5, fontSize: 11 }}>({(customEntityInstances[typeId] || []).length})</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -8540,22 +8870,32 @@ export default function App() {
 
 
                         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                            <div style={{ fontWeight: 700, marginBottom: 4 }}>{t('planner.triple.step4')}</div>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                                <div style={{ fontWeight: 700 }}>{t('planner.triple.step4')}</div>
+                                <button
+                                    onClick={() => setShowEntityLibrary(true)}
+                                    style={{
+                                        padding: "4px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12,
+                                        border: "1px solid rgba(255,255,255,0.2)",
+                                        background: "rgba(59,130,246,0.18)", color: "#93c5fd",
+                                        fontWeight: 700, display: "flex", alignItems: "center", gap: 5,
+                                    }}
+                                >
+                                    {t('planner.entityLibrary.open')}
+                                </button>
+                            </div>
                             <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 12, lineHeight: 1.4 }}>
                                 {t('planner.edit.desc')}
-                                <br />
-                                נוצרו: <b>{catTrafficSegs.length}</b> {t('planner.categories.traffic')}, <b>{catTollSegs.length}</b> {t('planner.categories.toll')}, <b>{catCommZones.length}</b> {t('planner.categories.comm')}, <b>{manualParks.length}</b> {t('planner.categories.parks')}.
                             </div>
 
-                            {/* רשימת הקטגוריות - שורות במקום כרטיסיות */}
-                            {/* רשימת הקטגוריות - מעודכן עם אייקון כביש אגרה כפול */}
+                            {/* שורות הישויות המובנות — מוצגות רק אם נבחרו מהספריה */}
                             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                                 {[
-                                    { key: "traffic", title: t('planner.categories.traffic') },
-                                    { key: "toll", title: t('planner.categories.toll') },
-                                    { key: "comm", title: t('planner.categories.comm') },
-                                    { key: "park", title: t('planner.categories.parks') },
-                                ].map((c, idx, arr) => (
+                                    { key: "traffic", builtinId: BUILTIN_TRAFFIC_ID, title: t('planner.categories.traffic') },
+                                    { key: "toll",    builtinId: BUILTIN_TOLL_ID,    title: t('planner.categories.toll') },
+                                    { key: "comm",    builtinId: BUILTIN_COMM_ID,    title: t('planner.categories.comm') },
+                                    { key: "park",    builtinId: BUILTIN_PARK_ID,    title: t('planner.categories.parks') },
+                                ].filter(c => activeEntityTypeIds.includes(c.builtinId)).map((c, idx, arr) => (
                                     <div
                                         key={c.key}
                                         style={{
@@ -8713,6 +9053,185 @@ export default function App() {
                                 ))}
                             </div>
 
+                            {/* ── יישויות מהספריה — שורות בתוך שלב 4 ── */}
+                            {(() => {
+                                const availableToAdd = entityLibrary.entities.filter(e => !activeEntityTypeIds.includes(e.id));
+                                const activeCustomIds = activeEntityTypeIds.filter(id => !id.startsWith('builtin-'));
+                                return (
+                                <div style={{ borderTop: activeEntityTypeIds.length > 0 ? "1px solid rgba(255,255,255,0.12)" : "none", marginTop: 4 }}>
+                                    {/* Dropdown להוספה */}
+                                    <div style={{ padding: "8px 0 2px 0" }}>
+                                        <select
+                                            value=""
+                                            onChange={e => {
+                                                const id = e.target.value;
+                                                if (!id) return;
+                                                setActiveEntityTypeIds(prev => prev.includes(id) ? prev : [...prev, id]);
+                                                setCustomEntityVisibility(prev => ({ ...prev, [id]: true }));
+                                            }}
+                                            style={{ width: "100%", padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(0,0,0,0.3)", color: "white", fontSize: 12 }}
+                                        >
+                                            <option value="">{t('planner.entityLibrary.add')}</option>
+                                            {availableToAdd.map(e => <option key={e.id} value={e.id}>{e.name || '(ללא שם)'}</option>)}
+                                        </select>
+                                    </div>
+
+                                    {/* שורה לכל יישות מותאמת פעילה (לא מובנית) */}
+                                    {activeCustomIds.map((typeId, idx, arr) => {
+                                        const def: EntityTypeDef | undefined = entityLibrary.entities.find(e => e.id === typeId);
+                                        if (!def) return null;
+                                        const instances = customEntityInstances[typeId] || [];
+                                        const count = instances.length;
+                                        const atMax = def.maxInstances > 0 && count >= def.maxInstances;
+                                        const isDrawing = customDrawTypeId === typeId;
+                                        const isDeleting = customDeleteTypeId === typeId;
+                                        const isVisible = customEntityVisibility[typeId] !== false;
+                                        const dotColor = def.geometryType === 'line' ? def.visual.strokeColor : def.visual.fillColor;
+                                        return (
+                                            <div
+                                                key={typeId}
+                                                style={{
+                                                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                                                    padding: "9px 0",
+                                                    borderBottom: idx < arr.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
+                                                }}
+                                            >
+                                                {/* אייקון + שם */}
+                                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                    <div style={{ width: 24, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                                                        {def.geometryType === 'line' && (
+                                                            <svg width="24" height="8" viewBox="0 0 24 8">
+                                                                <line x1="1" y1="4" x2="23" y2="4"
+                                                                    stroke={dotColor}
+                                                                    strokeWidth={Math.min(def.visual.strokeWidth, 4)}
+                                                                    strokeDasharray={def.visual.strokeStyle === 'dashed' ? "5 3" : def.visual.strokeStyle === 'dotted' ? "1 3" : def.visual.strokeStyle === 'long-dash' ? "8 3" : "none"}
+                                                                />
+                                                            </svg>
+                                                        )}
+                                                        {def.geometryType === 'polygon' && (
+                                                            <svg width="20" height="16" viewBox="0 0 20 16">
+                                                                <rect x="1" y="1" width="18" height="14" rx="2"
+                                                                    fill={dotColor} fillOpacity={def.visual.fillOpacity}
+                                                                    stroke={def.visual.strokeColor} strokeWidth="1.5"
+                                                                />
+                                                            </svg>
+                                                        )}
+                                                        {def.geometryType === 'circle' && (
+                                                            <svg width="18" height="18" viewBox="0 0 18 18">
+                                                                <circle cx="9" cy="9" r="7"
+                                                                    fill={dotColor} fillOpacity={def.visual.fillOpacity}
+                                                                    stroke={def.visual.strokeColor} strokeWidth="1.5"
+                                                                />
+                                                            </svg>
+                                                        )}
+                                                        {def.geometryType === 'point' && (
+                                                            <svg width="16" height="16" viewBox="0 0 16 16">
+                                                                <circle cx="8" cy="8" r="6"
+                                                                    fill={dotColor}
+                                                                    stroke={def.visual.strokeColor} strokeWidth="1.5"
+                                                                />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: 800, fontSize: 14 }}>{def.name || '(ללא שם)'}</div>
+                                                        <div style={{ fontSize: 11, opacity: 0.45 }}>
+                                                            {count}{def.maxInstances > 0 ? `/${def.maxInstances}` : ''} {t('planner.categories.entities')}
+                                                            {' · '}{def.snapToRoad ? t('planner.categories.snapToRoad') : t('planner.categories.free')}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* כפתורי פעולה */}
+                                                <div style={{ display: "flex", gap: 6 }}>
+                                                    {/* הוסף / סיים */}
+                                                    <button
+                                                        disabled={!isDrawing && atMax}
+                                                        onClick={() => {
+                                                            // נקה כל מצב ציור/מחיקה אחר
+                                                            setEntityDrawMode(null);
+                                                            setDraftEntityPts([]);
+                                                            setDraftCommCenter(null);
+                                                            setIsDrawingPark(false);
+                                                            setIsPickingPark(false);
+                                                            setDeleteCatMode(null);
+                                                            setCustomDeleteTypeId(null);
+                                                            setCustomDraftPts([]);
+                                                            setCustomDraftCenter(null);
+                                                            if (isDrawing) {
+                                                                setCustomDrawTypeId(null);
+                                                            } else if (!atMax) {
+                                                                setCustomDrawTypeId(typeId);
+                                                                const gLabel = def.geometryType === 'line' ? 'קו' : def.geometryType === 'polygon' ? 'פוליגון' : def.geometryType === 'circle' ? 'עיגול' : 'נקודה';
+                                                                showToast(`ציור ${def.name} (${gLabel})${def.geometryType === 'line' || def.geometryType === 'polygon' ? ' — דאבל-קליק לסיום' : ''}`);
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            padding: "6px 10px", borderRadius: 8, fontSize: 13, fontWeight: 700,
+                                                            border: "1px solid rgba(255,255,255,0.15)",
+                                                            background: isDrawing ? "rgba(46,204,113,0.25)" : "rgba(17,134,255,0.2)",
+                                                            color: "white", cursor: atMax && !isDrawing ? "not-allowed" : "pointer",
+                                                            opacity: !isDrawing && atMax ? 0.4 : 1,
+                                                        }}
+                                                    >
+                                                        {isDrawing ? t('planner.categories.finish') : t('planner.categories.add')}
+                                                    </button>
+
+                                                    {/* מחק */}
+                                                    <button
+                                                        onClick={() => {
+                                                            setCustomDrawTypeId(null);
+                                                            setCustomDraftPts([]);
+                                                            setCustomDraftCenter(null);
+                                                            setCustomDeleteTypeId(isDeleting ? null : typeId);
+                                                        }}
+                                                        style={{
+                                                            padding: "6px 10px", borderRadius: 8, fontSize: 13, fontWeight: 700,
+                                                            border: "1px solid rgba(255,255,255,0.15)",
+                                                            background: isDeleting ? "rgba(255,80,80,0.4)" : "rgba(255,255,255,0.05)",
+                                                            color: "white", cursor: "pointer",
+                                                        }}
+                                                    >
+                                                        {isDeleting ? t('planner.categories.active') : t('planner.categories.delete')}
+                                                    </button>
+
+                                                    {/* הצג/הסתר */}
+                                                    <button
+                                                        onClick={() => setCustomEntityVisibility(prev => ({ ...prev, [typeId]: !isVisible }))}
+                                                        style={{
+                                                            padding: "6px 8px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                                                            border: "1px solid rgba(255,255,255,0.15)",
+                                                            background: "rgba(255,255,255,0.05)",
+                                                            color: isVisible ? "white" : "rgba(255,255,255,0.3)", cursor: "pointer",
+                                                        }}
+                                                        title={isVisible ? t('planner.categories.hide') : t('planner.categories.show')}
+                                                    >
+                                                        {isVisible ? '👁' : '🙈'}
+                                                    </button>
+
+                                                    {/* × הסר מתרחיש */}
+                                                    <button
+                                                        onClick={() => {
+                                                            if (customDrawTypeId === typeId) setCustomDrawTypeId(null);
+                                                            if (customDeleteTypeId === typeId) setCustomDeleteTypeId(null);
+                                                            setActiveEntityTypeIds(prev => prev.filter(id => id !== typeId));
+                                                        }}
+                                                        style={{
+                                                            padding: "6px 8px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                                                            border: "1px solid rgba(255,80,80,0.3)",
+                                                            background: "rgba(255,80,80,0.1)",
+                                                            color: "#fca5a5", cursor: "pointer",
+                                                        }}
+                                                        title={t('planner.categories.removeFromScenario')}
+                                                    >×</button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                );
+                            })()}
+
                             {/* כפתורי בקרה כלליים בתחתית הקונטיינר */}
                             <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.15)", display: "flex", gap: 10 }}>
                                 <button
@@ -8722,11 +9241,16 @@ export default function App() {
                                             setCatTollSegs([]);
                                             setCatCommZones([]);
                                             setManualParks([]);
+                                            setCustomEntityInstances({});
                                             setEntityDrawMode(null);
                                             setDeleteCatMode(null);
                                             setDraftEntityPts([]);
                                             setDraftCommCenter(null);
                                             setIsDrawingPark(false);
+                                            setCustomDrawTypeId(null);
+                                            setCustomDeleteTypeId(null);
+                                            setCustomDraftPts([]);
+                                            setCustomDraftCenter(null);
                                             showToast(t('planner.toast.allDeleted'));
                                         }
                                     }}
@@ -8752,6 +9276,10 @@ export default function App() {
                                         setDraftEntityPts([]);
                                         setDraftCommCenter(null);
                                         setIsDrawingPark(false);
+                                        setCustomDrawTypeId(null);
+                                        setCustomDeleteTypeId(null);
+                                        setCustomDraftPts([]);
+                                        setCustomDraftCenter(null);
                                         showToast(t('planner.toast.editsCancelled'));
                                     }}
                                     style={{
@@ -8770,7 +9298,6 @@ export default function App() {
                                 </button>
                             </div>
                         </div>
-
 
                         <div>
 

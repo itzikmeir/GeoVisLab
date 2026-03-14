@@ -117,7 +117,17 @@
       "parkDrawInstructions": "קליק: הוסף נקודה · דאבל־קליק: סגור פוליגון · Delete: חזור צעד · ESC: ביטול",
       "cancelModes": "בטל מצבים",
       "deleteAll": "מחק הכל",
-      "manualParksTitle": "פארקים ידניים"
+      "manualParksTitle": "פארקים ידניים",
+      "snapToRoad": "עוקב ציר",
+      "free": "חופשי",
+      "entities": "יישויות",
+      "hide": "הסתר",
+      "show": "הצג",
+      "removeFromScenario": "הסר מהתרחיש"
+    },
+    "entityLibrary": {
+      "open": "🗂 ספריית יישויות",
+      "add": "+ הוסף יישות מהספריה..."
     },
     "actions": {
       "showResults": "הצג תוצאות",

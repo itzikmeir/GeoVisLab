@@ -118,7 +118,17 @@
       "parkDrawInstructions": "Click: Add point · Double-click: Close polygon · Delete: Undo step · ESC: Cancel",
       "cancelModes": "Cancel Modes",
       "deleteAll": "Delete All",
-      "manualParksTitle": "Manual Parks"
+      "manualParksTitle": "Manual Parks",
+      "snapToRoad": "Road-aligned",
+      "free": "Free",
+      "entities": "entities",
+      "hide": "Hide",
+      "show": "Show",
+      "removeFromScenario": "Remove from scenario"
+    },
+    "entityLibrary": {
+      "open": "🗂 Entity Library",
+      "add": "+ Add entity from library..."
     },
     "actions": {
       "showResults": "Show Results",
